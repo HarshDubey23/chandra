@@ -3,14 +3,39 @@
   "short_name": "GP Chandra",
   "description": "OSINT-Verified bilingual digital governance portal for Gram Panchayat Chandra, Shankargarh, Prayagraj, UP",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#fbf7f0",
+  "background_color": "#0a0a0a",
   "theme_color": "#c2410c",
   "lang": "hi",
   "dir": "ltr",
   "categories": ["government", "civic", "productivity"],
   "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "/logo.svg",
       "sizes": "any",
@@ -20,22 +45,22 @@
   ],
   "shortcuts": [
     {
-      "name": "Track Complaint",
-      "short_name": "Track",
+      "name": "शिकायत ट्रैक करें",
+      "short_name": "शिकायत",
       "description": "Track your complaint status",
       "url": "/?view=complaints"
     },
     {
-      "name": "View Schemes",
-      "short_name": "Schemes",
-      "description": "View government schemes and beneficiaries",
-      "url": "/?view=home#schemes"
+      "name": "योजनाएँ",
+      "short_name": "योजना",
+      "description": "View government schemes",
+      "url": "/#schemes"
     },
     {
-      "name": "View Budget",
-      "short_name": "Budget",
-      "description": "View panchayat budget allocation",
-      "url": "/?view=home#budget"
+      "name": "AI सहायक",
+      "short_name": "AI",
+      "description": "Talk to AI assistant",
+      "url": "/"
     }
   ]
 }

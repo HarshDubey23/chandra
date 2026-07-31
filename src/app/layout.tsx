@@ -86,17 +86,23 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
       { url: "/logo.svg", type: "image/svg+xml" },
     ],
-    shortcut: ["/logo.svg"],
+    shortcut: ["/icons/icon-192x192.png"],
     apple: [
-      { url: "/logo.svg" },
+      { url: "/icons/apple-icon.png", sizes: "180x180", type: "image/png" },
     ],
   },
   other: {
     "theme-color": "#0a0a0a",
     "msapplication-TileColor": "#0a0a0a",
     "msapplication-tap-highlight": "no",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "default",
+    "apple-mobile-web-app-title": "GP Chandra",
+    "mobile-web-app-capable": "yes",
   },
 };
 
