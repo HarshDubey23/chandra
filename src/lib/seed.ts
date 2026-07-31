@@ -116,36 +116,36 @@ async function main() {
   console.log('  ✓ Site settings seeded (pradhan, secretary, site_config)')
 
   // ── 3. Image Assets — REAL WhatsApp photographs (no AI images) ────────
-  // All 88 JPGs + 3 MP4s from the WhatsApp chat are seeded as ImageAsset
-  // records pointing to /whatsapp/{filename}. Categories are assigned from
-  // VLM analysis of a sample + curated mapping; bulk images round-robin
+  // All webp images in /whatsapp-optimized/ are seeded as ImageAsset records.
+  // Categories are assigned from curated mapping; bulk images round-robin
   // across infrastructure/scheme/event/health/education categories.
-  const waDir = path.join(process.cwd(), 'public', 'whatsapp')
+  const waDir = path.join(process.cwd(), 'public', 'whatsapp-optimized')
   const waFiles: string[] = fs.existsSync(waDir)
-    ? fs.readdirSync(waDir).filter((f: string) => /^IMG-.*\.jpg$/i.test(f)).sort()
+    ? fs.readdirSync(waDir).filter((f: string) => /^IMG-.*\.webp$/i.test(f)).sort()
     : []
 
   // Curated mapping for known images (VLM-analyzed + chat context)
+  // Keys use .webp (actual files in /whatsapp-optimized/)
   const KNOWN: Record<string, { category: string; subcategory?: string; scrollSection: string; purpose: string; hi: string; en: string; schemes?: string[]; faces?: number }> = {
-    'IMG-20260725-WA0003.jpg': { category: 'event.people.pradhan', scrollSection: 'representatives', purpose: 'portrait', hi: 'श्रीमती संगीता मिश्रा, ग्राम प्रधान', en: 'Smt. Sangita Mishra, Gram Pradhan', faces: 1 },
-    'IMG-20260725-WA0004.jpg': { category: 'document.education', scrollSection: 'representatives', purpose: 'document', hi: 'प्रधान जी की शैक्षिक योग्यता प्रमाण पत्र', en: "Pradhan's educational qualification certificate" },
-    'IMG-20260725-WA0005.jpg': { category: 'document.education', scrollSection: 'representatives', purpose: 'document', hi: 'प्रधान जी की शैक्षिक योग्यता प्रमाण पत्र', en: "Pradhan's educational qualification certificate" },
-    'IMG-20260725-WA0006.jpg': { category: 'document.education', scrollSection: 'representatives', purpose: 'document', hi: 'प्रधान जी की शैक्षिक योग्यता प्रमाण पत्र', en: "Pradhan's educational qualification certificate" },
-    'IMG-20260725-WA0007.jpg': { category: 'document.education', scrollSection: 'representatives', purpose: 'document', hi: 'प्रधान जी की शैक्षिक योग्यता प्रमाण पत्र', en: "Pradhan's educational qualification certificate" },
-    'IMG-20260725-WA0008.jpg': { category: 'document.office', scrollSection: 'representatives', purpose: 'document', hi: 'ग्राम पंचायत कार्यालय का दस्तावेज़', en: 'Gram Panchayat office document' },
-    'IMG-20260725-WA0009.jpg': { category: 'document.office', scrollSection: 'representatives', purpose: 'document', hi: 'ग्राम पंचायत कार्यालय का दस्तावेज़', en: 'Gram Panchayat office document' },
-    'IMG-20260725-WA0011.jpg': { category: 'infrastructure.school.building', scrollSection: 'school', purpose: 'asset-evidence', hi: 'चंद्रा प्राथमिक विद्यालय भवन, शैक्षिक भित्तिचित्रों सहित', en: 'Chandra primary school building with educational murals' },
-    'IMG-20260725-WA0016.jpg': { category: 'event.gram-sabha', scrollSection: 'events', purpose: 'event', hi: 'रात्रि में ग्राम पंचायत बैठक', en: 'Panchayat meeting at night', schemes: ['GPDP'], faces: 12 },
-    'IMG-20260725-WA0020.jpg': { category: 'infrastructure.water.supply', scrollSection: 'water-infrastructure', purpose: 'asset-evidence', hi: 'जल टंकी द्वारा जल आपूर्ति', en: 'Water supply by tanker', schemes: ['JJM'], faces: 6 },
-    'IMG-20260725-WA0030.jpg': { category: 'infrastructure.school.classroom', scrollSection: 'school', purpose: 'asset-evidence', hi: 'ग्राम चंद्रा की प्राथमिक विद्यालय कक्षा', en: 'Primary school classroom at village Chandra', faces: 15 },
-    'IMG-20260725-WA0036.jpg': { category: 'event.training', scrollSection: 'events', purpose: 'event', hi: 'सुरक्षा उपकरण सहित प्रशिक्षण सत्र', en: 'Training session with safety gear', faces: 10 },
-    'IMG-20260725-WA0042.jpg': { category: 'infrastructure.water.well', scrollSection: 'water-infrastructure', purpose: 'asset-evidence', hi: 'ग्राम चंद्रा में कुआँ/जल टंकी निर्माण', en: 'Well/water tank construction at village Chandra', faces: 3 },
-    'IMG-20260725-WA0065.jpg': { category: 'infrastructure.agriculture', scrollSection: 'agriculture', purpose: 'asset-evidence', hi: 'ग्राम चंद्रा में खेत, GPS स्थान सहित', en: 'Field at village Chandra with GPS location', faces: 1 },
-    'IMG-20260725-WA0072.jpg': { category: 'event.independence-day', scrollSection: 'events', purpose: 'event', hi: 'पंचायत भवन पर झंडारोहण समारोह', en: 'Flag hoisting ceremony at panchayat building', faces: 20 },
-    'IMG-20260725-WA0080.jpg': { category: 'event.gram-sabha', scrollSection: 'events', purpose: 'event', hi: 'विकसित भारत संकल्प यात्रा, ग्राम सभा', en: 'Viksit Bharat Sankalp Yatra village gathering', faces: 25 },
-    'IMG-20260725-WA0083.jpg': { category: 'event.people', scrollSection: 'representatives', purpose: 'portrait', hi: 'प्रधान जी का व्यक्तिगत दृश्य', en: "Pradhan's personal view", faces: 1 },
-    'IMG-20260725-WA0091.jpg': { category: 'event.people.gpa', scrollSection: 'representatives', purpose: 'portrait', hi: 'श्री बलवंत चौहान, ग्राम पंचायत अधिकारी', en: 'Shri Balwant Chauhan, Gram Panchayat Adhikari', faces: 1 },
-    'IMG-20260725-WA0092.jpg': { category: 'document.office', scrollSection: 'representatives', purpose: 'document', hi: 'ग्राम पंचायत अधिकारी संबंधित दस्तावेज़', en: 'Gram Panchayat Adhikari related document' },
+    'IMG-20260725-WA0003.webp': { category: 'event.people.pradhan', scrollSection: 'representatives', purpose: 'portrait', hi: 'श्रीमती संगीता मिश्रा, ग्राम प्रधान', en: 'Smt. Sangita Mishra, Gram Pradhan', faces: 1 },
+    'IMG-20260725-WA0004.webp': { category: 'document.education', scrollSection: 'representatives', purpose: 'document', hi: 'प्रधान जी की शैक्षिक योग्यता प्रमाण पत्र', en: "Pradhan's educational qualification certificate" },
+    'IMG-20260725-WA0005.webp': { category: 'document.education', scrollSection: 'representatives', purpose: 'document', hi: 'प्रधान जी की शैक्षिक योग्यता प्रमाण पत्र', en: "Pradhan's educational qualification certificate" },
+    'IMG-20260725-WA0006.webp': { category: 'document.education', scrollSection: 'representatives', purpose: 'document', hi: 'प्रधान जी की शैक्षिक योग्यता प्रमाण पत्र', en: "Pradhan's educational qualification certificate" },
+    'IMG-20260725-WA0007.webp': { category: 'document.education', scrollSection: 'representatives', purpose: 'document', hi: 'प्रधान जी की शैक्षिक योग्यता प्रमाण पत्र', en: "Pradhan's educational qualification certificate" },
+    'IMG-20260725-WA0008.webp': { category: 'document.office', scrollSection: 'representatives', purpose: 'document', hi: 'ग्राम पंचायत कार्यालय का दस्तावेज़', en: 'Gram Panchayat office document' },
+    'IMG-20260725-WA0009.webp': { category: 'document.office', scrollSection: 'representatives', purpose: 'document', hi: 'ग्राम पंचायत कार्यालय का दस्तावेज़', en: 'Gram Panchayat office document' },
+    'IMG-20260725-WA0011.webp': { category: 'infrastructure.school.building', scrollSection: 'school', purpose: 'asset-evidence', hi: 'चंद्रा प्राथमिक विद्यालय भवन, शैक्षिक भित्तिचित्रों सहित', en: 'Chandra primary school building with educational murals' },
+    'IMG-20260725-WA0016.webp': { category: 'event.gram-sabha', scrollSection: 'events', purpose: 'event', hi: 'रात्रि में ग्राम पंचायत बैठक', en: 'Panchayat meeting at night', schemes: ['GPDP'], faces: 12 },
+    'IMG-20260725-WA0020.webp': { category: 'infrastructure.water.supply', scrollSection: 'water-infrastructure', purpose: 'asset-evidence', hi: 'जल टंकी द्वारा जल आपूर्ति', en: 'Water supply by tanker', schemes: ['JJM'], faces: 6 },
+    'IMG-20260725-WA0030.webp': { category: 'infrastructure.school.classroom', scrollSection: 'school', purpose: 'asset-evidence', hi: 'ग्राम चंद्रा की प्राथमिक विद्यालय कक्षा', en: 'Primary school classroom at village Chandra', faces: 15 },
+    'IMG-20260725-WA0036.webp': { category: 'event.training', scrollSection: 'events', purpose: 'event', hi: 'सुरक्षा उपकरण सहित प्रशिक्षण सत्र', en: 'Training session with safety gear', faces: 10 },
+    'IMG-20260725-WA0042.webp': { category: 'infrastructure.water.well', scrollSection: 'water-infrastructure', purpose: 'asset-evidence', hi: 'ग्राम चंद्रा में कुआँ/जल टंकी निर्माण', en: 'Well/water tank construction at village Chandra', faces: 3 },
+    'IMG-20260725-WA0065.webp': { category: 'infrastructure.agriculture', scrollSection: 'agriculture', purpose: 'asset-evidence', hi: 'ग्राम चंद्रा में खेत, GPS स्थान सहित', en: 'Field at village Chandra with GPS location', faces: 1 },
+    'IMG-20260725-WA0072.webp': { category: 'event.independence-day', scrollSection: 'events', purpose: 'event', hi: 'पंचायत भवन पर झंडारोहण समारोह', en: 'Flag hoisting ceremony at panchayat building', faces: 20 },
+    'IMG-20260725-WA0080.webp': { category: 'event.gram-sabha', scrollSection: 'events', purpose: 'event', hi: 'विकसित भारत संकल्प यात्रा, ग्राम सभा', en: 'Viksit Bharat Sankalp Yatra village gathering', faces: 25 },
+    'IMG-20260725-WA0083.webp': { category: 'event.people', scrollSection: 'representatives', purpose: 'portrait', hi: 'प्रधान जी का व्यक्तिगत दृश्य', en: "Pradhan's personal view", faces: 1 },
+    'IMG-20260725-WA0091.webp': { category: 'event.people.gpa', scrollSection: 'representatives', purpose: 'portrait', hi: 'श्री बलवंत चौहान, ग्राम पंचायत अधिकारी', en: 'Shri Balwant Chauhan, Gram Panchayat Adhikari', faces: 1 },
+    'IMG-20260725-WA0092.webp': { category: 'document.office', scrollSection: 'representatives', purpose: 'document', hi: 'ग्राम पंचायत अधिकारी संबंधित दस्तावेज़', en: 'Gram Panchayat Adhikari related document' },
   }
 
   // Round-robin category pool for bulk (unmapped) images
@@ -173,7 +173,7 @@ async function main() {
     const schemes = known?.schemes ?? BULK_CATS[bulkIdx % BULK_CATS.length].schemes ?? []
     if (!known) bulkIdx++
     const imageId = 'wa_' + file.replace(/[^0-9]/g, '')
-    const url = `/whatsapp/${file}`
+    const url = `/whatsapp-optimized/${file}`
     const sha = sha256(file + imageId)
     await db.imageAsset.upsert({
       where: { imageId },
