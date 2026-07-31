@@ -43,6 +43,7 @@ import { RecentComplaints } from './RecentComplaints'
 import { DepartmentDirectory } from './DepartmentDirectory'
 import { KineticDivider } from './KineticDivider'
 import { PortalActivityFeed } from './PortalActivityFeed'
+import { VillageRecords } from './VillageRecords'
 
 export function PublicPortal() {
   return (
@@ -68,6 +69,7 @@ export function PublicPortal() {
       <KineticDivider variant="dots" />
       <Schemes />
       <SchemeEligibilityChecker />
+      <VillageRecords />
       <KineticDivider variant="line" />
       <VillageStats />
       <VillageMap />

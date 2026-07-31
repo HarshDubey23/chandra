@@ -29,6 +29,7 @@ const SECTIONS: SectionInfo[] = [
   { id: 'about', labelHi: 'परिचय', labelEn: 'About', emoji: 'ℹ️' },
   { id: 'representatives', labelHi: 'पदाधिकारी', labelEn: 'Reps', emoji: '👥' },
   { id: 'schemes', labelHi: 'योजनाएँ', labelEn: 'Schemes', emoji: '📋' },
+  { id: 'village-records', labelHi: 'ग्राम रिकॉर्ड', labelEn: 'Records', emoji: '📊' },
   { id: 'eligibility', labelHi: 'पात्रता', labelEn: 'Eligibility', emoji: '✅' },
   { id: 'village-stats', labelHi: 'सांख्यिकी', labelEn: 'Stats', emoji: '📈' },
   { id: 'wards', labelHi: 'वार्ड', labelEn: 'Wards', emoji: '🗺️' },

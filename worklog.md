@@ -362,3 +362,31 @@ Unresolved risks / next-phase recommendations:
 - To make Vapi call-transfer LIVE: the Vapi assistant (ID b3bcf257-175c-48d3-b333-365baa4eaaab) needs the `transferCall` function configured in the Vapi dashboard with the `+91` number format. The webhook handler is ready.
 - Consider adding a `/api/departments` CRUD endpoint so admin can add/edit departments from the UI (currently seeded via script only).
 - The floating nav could be enhanced with search/filter for the 23 sections.
+
+---
+Task ID: 11 (real village data — pensions, housing, ration, handpumps, offline help, kitchen team)
+Agent: main
+Task: Add all real village data provided by user: pension beneficiary lists, housing lists, ration card, handpump locations, offline help contacts, school kitchen team photo
+
+Work Log:
+- User provided extensive real village data: widow/old-age/disability pensions with beneficiary names, PMAY-G + CM Awas housing lists with beneficiary names + amounts, ration card family categories (AAY/BPL/APL), 13 government handpump locations with specific house references, 2 offline help contacts (Gudiya Studio — Surya Prasad Gupta 9792983671, FPS shop — Ajay Kumar 9721144741), and a school kitchen team photo.
+- Saved the kitchen team photo to `public/whatsapp-optimized/school-kitchen-team.webp`.
+- Created `src/data/village-data.ts` — comprehensive data file with all real village data: OFFLINE_HELP (2 contacts with phone + services), PENSION_BENEFICIARIES (3 pension types with named beneficiaries + wards + status), HOUSING_BENEFICIARIES (PMAY-G + CM Awas + new applications with amounts received), RATION_CARD_DATA (3 categories + totals + FPS shop), VBGRAM_DATA (family register + labor list), HANDPUMPS (13 handpumps with exact locations + status), SCHOOL_KITCHEN_TEAM (photo URL + description).
+- Created `src/components/portal/VillageRecords.tsx` — a new portal section with 6 tabs:
+  * **पेंशन (Pensions)**: 3 pension types (widow ₹1000/mo, old-age ₹1000/mo, disability ₹1000/mo) with named beneficiaries, ward numbers, status badges.
+  * **आवास (Housing)**: PMAY-G (₹1,25,000) + CM Awas (₹70,000) beneficiary lists with amounts received + completion status + new applications.
+  * **राशन कार्ड (Ration Card)**: AAY (18 families) / BPL (42) / APL (127) breakdown + FPS shop contact + new applications + family register + labor list.
+  * **हैंडपंप (Handpumps)**: All 13 government handpumps with exact locations (Hetram Mishra ke ghar ke samne, Harishchandra Patel ke ghar ke samne, Panchayat Bhavan, Kali Mata Mandir marg, etc.) + working/needs-deepening status.
+  * **ऑफलाइन सहायता (Offline Help)**: Gudiya Studio (Surya Prasad Gupta — 9792983671) + FPS shop (Ajay Kumar — 9721144741) with tap-to-call buttons.
+  * **रसोई टीम (Kitchen Team)**: Full photo of Primary School Chandra Khas kitchen team with caption.
+- Added VillageRecords to PublicPortal (after Schemes + SchemeEligibilityChecker).
+- Added "ग्राम रिकॉर्ड" entry to FloatingSectionNav (now 24 sections).
+- `bun run lint` — ZERO errors.
+- Agent Browser verification: all 6 tabs render, handpumps show 13 entries (HP-01 to HP-13), offline help shows Gudiya Studio, school team photo present.
+
+Stage Summary:
+- Dev server: port 3000, HTTP 200. Webhook: port 3003 healthy.
+- NEW: `src/data/village-data.ts` (comprehensive real village data), `src/components/portal/VillageRecords.tsx` (6-tab records section).
+- All real beneficiary names, phone numbers, handpump locations, and the kitchen team photo are now live in the portal.
+- All 60+ portal components + new VillageRecords = 61+ sections PRESERVED.
+- `bun run lint` passes clean.
