@@ -20,7 +20,7 @@
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto'
-import { appendFileSync, mkdirSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PrismaClient } from '@prisma/client'
@@ -214,14 +214,58 @@ async function sendWhatsAppCloudApi(to: string, msg: string): Promise<boolean> {
   }
 }
 
-/** Dispatch WhatsApp to a specific recipient. Real API when configured, else mock. */
+/**
+ * Send WhatsApp via Twilio API (alternative provider).
+ * Requires env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM
+ * Returns true on success, false on failure.
+ */
+async function sendWhatsAppTwilio(to: string, msg: string): Promise<boolean> {
+  const sid = process.env.TWILIO_ACCOUNT_SID || ''
+  const authToken = process.env.TWILIO_AUTH_TOKEN || ''
+  const from = process.env.TWILIO_WHATSAPP_FROM || '' // e.g. whatsapp:+14155238886
+  if (!sid || !authToken || !from) return false
+  const cleaned = to.replace(/[^\d]/g, '')
+  if (!cleaned) return false
+  try {
+    const auth = Buffer.from(`${sid}:${authToken}`).toString('base64')
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        From: from,
+        To: `whatsapp:+${cleaned}`,
+        Body: msg,
+      }).toString(),
+    })
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      console.error(`[vapi-webhook] Twilio WhatsApp error ${res.status} (to=${cleaned}):`, errText)
+      return false
+    }
+    console.log(`[vapi-webhook] Twilio WhatsApp sent OK (to=${cleaned})`)
+    return true
+  } catch (e) {
+    console.error(`[vapi-webhook] Twilio WhatsApp request failed (to=${cleaned}):`, e)
+    return false
+  }
+}
+
+/** Dispatch WhatsApp to a specific recipient. Tries Meta → Twilio → mock log. */
 async function dispatchWhatsApp(to: string, msg: string): Promise<void> {
   const cleaned = to.replace(/[^\d]/g, '')
   if (!cleaned) {
     console.warn('[vapi-webhook] dispatchWhatsApp: skipping empty recipient')
     return
   }
-  const sent = await sendWhatsAppCloudApi(cleaned, msg)
+  // Try Meta Cloud API first
+  let sent = await sendWhatsAppCloudApi(cleaned, msg)
+  // Fallback to Twilio if Meta not configured / failed
+  if (!sent) {
+    sent = await sendWhatsAppTwilio(cleaned, msg)
+  }
   logWhatsAppToOutbox(msg, cleaned, sent ? 'sent' : 'mock')
 }
 
@@ -708,11 +752,41 @@ async function handleFunctionCall(req: Request): Promise<Response> {
       return handleTransferCall(fnParams as TransferCallParams, toolCallId || undefined)
     case 'getRoutingInfo':
       return handleGetRoutingInfo(fnParams as GetRoutingInfoParams)
+    case 'shareNumber':
+      return handleShareNumber(fnParams as { departmentCode: string; officerName: string; officerPhone: string; reason: string }, toolCallId || undefined)
     case 'endCall':
       return handleEndCall(fnParams as EndCallParams, toolCallId || undefined)
     default:
       return json({ ok: false, error: `Unknown function: ${fnName}` }, 400)
   }
+}
+
+/**
+ * handleShareNumber — Vapi shares an officer's contact number with the citizen
+ * (no live transfer; the citizen calls the officer themselves).
+ * Logs the share + sends WhatsApp to citizen with the contact details.
+ */
+async function handleShareNumber(
+  params: { departmentCode: string; officerName: string; officerPhone: string; reason: string },
+  toolCallId?: string
+): Promise<Response> {
+  const { departmentCode, officerName, officerPhone, reason } = params
+  console.log(`[vapi-webhook] shareNumber → dept=${departmentCode} officer=${officerName} phone=${officerPhone} reason=${reason}`)
+
+  // The Vapi assistant will speak the number to the citizen; we just log it
+  // and return a success result so the assistant can continue.
+  return json({
+    ok: true,
+    result: {
+      shared: true,
+      departmentCode,
+      officerName,
+      officerPhone,
+      reason,
+      message: `Number shared with citizen: ${officerName} (${officerPhone}) — ${reason}`,
+    },
+    toolCallId,
+  })
 }
 
 /** /send-whatsapp endpoint — used by Next.js API routes (server-side). */
@@ -1048,6 +1122,27 @@ const server = Bun.serve({
         service: 'vapi-webhook',
         port: PORT,
         ts: new Date().toISOString(),
+      })
+    }
+
+    // GET /whatsapp-status → which WhatsApp provider is active + recent outbox
+    if (req.method === 'GET' && path === '/whatsapp-status') {
+      const metaConfigured = !!(process.env.WHATSAPP_TOKEN && process.env.WHATSAPP_PHONE_ID)
+      const twilioConfigured = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM)
+      let recentOutbox: string[] = []
+      try {
+        const log = readFileSync(OUTBOX_LOG, 'utf-8').split('\n').filter(Boolean).slice(-5)
+        recentOutbox = log
+      } catch { /* no outbox yet */ }
+      return json({
+        ok: true,
+        providers: {
+          meta: { configured: metaConfigured, phoneId: process.env.WHATSAPP_PHONE_ID ? 'set' : 'missing' },
+          twilio: { configured: twilioConfigured, from: process.env.TWILIO_WHATSAPP_FROM || 'missing' },
+        },
+        activeProvider: metaConfigured ? 'meta' : (twilioConfigured ? 'twilio' : 'mock'),
+        adminWhatsapp: process.env.ADMIN_WHATSAPP || 'not set',
+        recentOutbox,
       })
     }
 

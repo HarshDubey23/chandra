@@ -16,6 +16,7 @@ import { QuickStats } from '@/components/portal/QuickStats'
 import { ServiceWorkerRegister } from '@/components/portal/ServiceWorkerRegister'
 import { InstallPrompt } from '@/components/portal/InstallPrompt'
 import { LivePortalStats } from '@/components/portal/LivePortalStats'
+import { FloatingSectionNav } from '@/components/portal/FloatingSectionNav'
 import { LandingPage } from '@/components/auth/LandingPage'
 import { CitizenDashboard } from '@/components/auth/CitizenDashboard'
 import { useUI } from '@/lib/ui-store'
@@ -87,6 +88,7 @@ export default function Home() {
       <ServiceWorkerRegister />
       <InstallPrompt />
       {view === 'home' && !showDashboard && <LivePortalStats />}
+      {view === 'home' && !showDashboard && <FloatingSectionNav />}
     </div>
   )
 }

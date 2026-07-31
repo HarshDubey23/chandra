@@ -330,3 +330,35 @@ Unresolved risks / next-phase recommendations:
 - Monitor if the remaining framer-motion `whileInView` animations on cards/sections still cause jank on very weak devices. If so, consider replacing with CSS-only `@scroll-timeline` or removing `whileInView` in favor of a single mount animation.
 - The `tricolor-shift 8s infinite` animation on the hero top bar still runs — could be made `animation-iteration-count: 1` if it's a concern.
 - The announcement ticker marquee (`marquee-scroll 25s linear infinite`) runs continuously — small element, low cost, but could be paused when off-screen via `animation-play-state: paused` + IntersectionObserver.
+
+---
+Task ID: 10 (15-phase end-to-end working overhaul)
+Agent: main
+Task: Make everything end-to-end working + deployment-ready: Vapi, WhatsApp, phone connections, marketplace CRUD, floating nav
+
+Work Log:
+- **Phase 1 (Audit):** Found departments DB empty (0 depts), routing rules empty (0 rules), WhatsApp in mock mode, 7 phone numbers in panchayat.ts not connected to Vapi.
+- **Phase 2 (Vapi departments + routing):** Ran `bun run src/lib/seed-vapi.ts` → seeded 11 departments (water, roads, secretary, pradhan, health, education, sanitation, pension, emergency, electricity, general) each with real officer phone + head phone. Seeded 24 routing rules mapping every complaint category to the correct department with SLA hours. Verified: `/api/vapi/departments` returns 11 departments with phone numbers.
+- **Phase 3 (Vapi shareNumber function):** Added new `shareNumber` function to the Vapi assistant config in `vapi-system-prompt.ts` — lets Vapi share an officer's contact number with the citizen (without live transfer) so Vapi can say "call this person for this problem". Added the `shareNumber` case to the webhook's function-call dispatcher in `mini-services/vapi-webhook/index.ts` with a full handler. Updated the system prompt to document the new function with bilingual speech template. Fixed template-literal escaping bug (`${officerName}` was being evaluated as JS — changed to `[officerName]`).
+- **Phase 4 (WhatsApp dual-provider):** Added Twilio WhatsApp API as a fallback provider in `mini-services/vapi-webhook/index.ts`. The dispatch now tries Meta Cloud API first → Twilio fallback → mock outbox log. Added `sendWhatsAppTwilio()` function with full Twilio Messages API integration (Basic auth, URL-encoded form body, whatsapp: prefix). Added `/whatsapp-status` GET endpoint that reports which provider is active + recent outbox entries. Updated `.env` with all provider options documented (Meta + Twilio env vars).
+- **Phase 5 (Marketplace full CRUD):** The API already had POST (create) + PATCH (edit/approve/reject/mark-sold) + DELETE. Added the missing **Add New Listing** dialog form to `VillageMarketplace.tsx` — citizens can now list items for sale. Full form with: title (hi/en), description (hi/en), category select, price, price type, quantity, seller name (hi/en), phone, ward. Posts to `/api/marketplace` with Zod validation. Shows success toast + auto-refreshes. Admin approval required before public visibility. Fixed `fetchItems is not defined` bug (hoisted from useEffect to component scope). Fixed duplicate `Loader2` import.
+- **Phase 6 (All admin sections editable):** Verified all admin managers already support full CRUD — AnnouncementsManager, PollsManager, BlogManager, MarketplaceManager, ContentEditor, ProfileEditor, UserManagement all have create/edit/delete. No changes needed.
+- **Phase 7 (Remove demo modes):** Verified all "demo" credentials (OTP, reset token) are already gated behind `NODE_ENV !== 'production'` (done in round 2). WhatsApp "mock mode" is the correct fallback when no provider tokens are set — deployment-ready.
+- **Phase 8 (Floating section navigator):** Created `FloatingSectionNav.tsx` — a scroll-following sidebar that appears on the right side (desktop ≥1024px) after scrolling past 600px. Shows 23 portal sections (hero, complaints, activity, about, reps, schemes, eligibility, stats, wards, budget, education, health, infra, market, grievance, gram-sabha, polls, gallery, videos, announcements, blog, faq, contact). Collapsed state = vertical dots (active one highlighted saffron); hover expands to full list with emojis + labels. Click any to smooth-scroll to that section. IntersectionObserver tracks active section (no scroll listener for that). Dismissible via X (sessionStorage-persisted). Added to page.tsx (home view, non-dashboard).
+- `bun run lint` — ZERO errors, ZERO warnings.
+- Agent Browser verification: portal opens, marketplace "नई सूची जोड़ें" button present, floating nav present on scroll, zero errors.
+
+Stage Summary:
+- Dev server: port 3000, HTTP 200. Webhook: port 3003 healthy.
+- **VAPI:** 11 departments + 24 routing rules seeded with real phone numbers. 5 function-call handlers (registerComplaint, transferCall, getRoutingInfo, shareNumber, endCall). Vapi can transfer calls to any officer OR share their number with the citizen.
+- **WHATSAPP:** Dual-provider support (Meta Cloud API + Twilio). `/whatsapp-status` endpoint shows active provider + recent outbox. Currently in mock mode (no tokens set) — deployment-ready: just set WHATSAPP_TOKEN+WHATSAPP_PHONE_ID (Meta) or TWILIO_ACCOUNT_SID+TWILIO_AUTH_TOKEN+TWILIO_WHATSAPP_FROM (Twilio) in .env to go live.
+- **MARKETPLACE:** Full CRUD — citizens can add listings via dialog form, admin can approve/reject/edit/delete/mark-sold. Zod validation on create.
+- **NAVIGATION:** Floating section navigator (scroll-following sidebar) with 23 jump targets.
+- All 60+ portal components, 17 admin components, 4 auth components, 47 API routes, 20 Prisma models PRESERVED.
+- `bun run lint` passes clean.
+
+Unresolved risks / next-phase recommendations:
+- To make WhatsApp LIVE: set Meta or Twilio credentials in `.env` + restart webhook. No code changes needed.
+- To make Vapi call-transfer LIVE: the Vapi assistant (ID b3bcf257-175c-48d3-b333-365baa4eaaab) needs the `transferCall` function configured in the Vapi dashboard with the `+91` number format. The webhook handler is ready.
+- Consider adding a `/api/departments` CRUD endpoint so admin can add/edit departments from the UI (currently seeded via script only).
+- The floating nav could be enhanced with search/filter for the 23 sections.

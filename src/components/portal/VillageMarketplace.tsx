@@ -6,8 +6,17 @@ import { useI18n } from '@/lib/i18n'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose,
+} from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { ScrollReveal } from './ScrollReveal'
+import { Plus, X, Loader2 } from 'lucide-react'
 import {
   Store,
   Package,
@@ -23,7 +32,6 @@ import {
   TrendingUp,
   Calendar,
   Layers,
-  Loader2,
 } from 'lucide-react'
 
 // ── Category metadata ───────────────────────────────────────────────────
@@ -94,6 +102,174 @@ function formatPrice(price: number | null, priceType: string, isHi: boolean): st
   return `₹${formatted}`
 }
 
+// ── Add Listing Dialog (citizens can list new items) ───────────────────
+function AddListingDialog({ isHi, onCreated }: { isHi: boolean; onCreated: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [form, setForm] = useState({
+    titleHi: '', titleEn: '', descHi: '', descEn: '',
+    category: 'produce', price: '', priceType: 'fixed',
+    quantity: '', sellerNameHi: '', sellerNameEn: '', sellerPhone: '', sellerWard: '',
+  })
+
+  const handleSubmit = async () => {
+    // Validate required fields
+    if (!form.titleHi.trim() || !form.titleEn.trim()) {
+      toast.error(isHi ? 'कृपया शीर्षक दर्ज करें (हिंदी + अंग्रेज़ी)' : 'Please enter title (Hindi + English)')
+      return
+    }
+    if (!form.sellerNameHi.trim() || !form.sellerPhone.trim()) {
+      toast.error(isHi ? 'कृपया विक्रेता नाम और फ़ोन दर्ज करें' : 'Please enter seller name and phone')
+      return
+    }
+    if (form.sellerPhone.replace(/\D/g, '').length < 10) {
+      toast.error(isHi ? 'सही 10-अंकीय फ़ोन नंबर दर्ज करें' : 'Enter valid 10-digit phone')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/marketplace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          titleHi: form.titleHi.trim(),
+          titleEn: form.titleEn.trim(),
+          descHi: form.descHi.trim() || null,
+          descEn: form.descEn.trim() || null,
+          category: form.category,
+          price: form.price ? parseInt(form.price) : null,
+          priceType: form.priceType,
+          quantity: form.quantity.trim() || null,
+          sellerNameHi: form.sellerNameHi.trim(),
+          sellerNameEn: form.sellerNameEn.trim() || form.sellerNameHi.trim(),
+          sellerPhone: form.sellerPhone.replace(/\D/g, '').slice(-10),
+          sellerWard: form.sellerWard ? parseInt(form.sellerWard) : null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'create_failed')
+      toast.success(isHi ? 'सूची सफलतापूर्वक जोड़ी गई! अधिकृत होने के बाद दिखाई देगी।' : 'Listing added! Will show after admin approval.')
+      setOpen(false)
+      setForm({
+        titleHi: '', titleEn: '', descHi: '', descEn: '',
+        category: 'produce', price: '', priceType: 'fixed',
+        quantity: '', sellerNameHi: '', sellerNameEn: '', sellerPhone: '', sellerWard: '',
+      })
+      onCreated()
+    } catch (e) {
+      toast.error(isHi ? 'सूची जोड़ने में विफल' : 'Failed to add listing')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button className="gap-2 rounded-full shadow-md" size="sm">
+          <Plus className="h-4 w-4" />
+          {isHi ? 'नई सूची जोड़ें' : 'Add New Listing'}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl">
+            {isHi ? 'नई बाजार सूची जोड़ें' : 'Add New Marketplace Listing'}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 py-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">{isHi ? 'शीर्षक (हिंदी) *' : 'Title (Hindi) *'}</Label>
+              <Input value={form.titleHi} onChange={e => setForm(f => ({ ...f, titleHi: e.target.value }))} placeholder="उपज का नाम" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{isHi ? 'शीर्षक (अंग्रेज़ी) *' : 'Title (English) *'}</Label>
+              <Input value={form.titleEn} onChange={e => setForm(f => ({ ...f, titleEn: e.target.value }))} placeholder="Item name" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">{isHi ? 'विवरण (हिंदी)' : 'Description (Hindi)'}</Label>
+              <Textarea value={form.descHi} onChange={e => setForm(f => ({ ...f, descHi: e.target.value }))} rows={2} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{isHi ? 'विवरण (अंग्रेज़ी)' : 'Description (English)'}</Label>
+              <Textarea value={form.descEn} onChange={e => setForm(f => ({ ...f, descEn: e.target.value }))} rows={2} />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">{isHi ? 'श्रेणी' : 'Category'}</Label>
+              <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.filter(c => c.key !== 'all').map(c => (
+                    <SelectItem key={c.key} value={c.key}>{isHi ? c.hi : c.en} {c.emoji}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{isHi ? 'मूल्य (₹)' : 'Price (₹)'}</Label>
+              <Input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0" inputMode="numeric" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{isHi ? 'मूल्य प्रकार' : 'Price Type'}</Label>
+              <Select value={form.priceType} onValueChange={v => setForm(f => ({ ...f, priceType: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PRICE_TYPES.map(p => (
+                    <SelectItem key={p.key} value={p.key}>{isHi ? p.hi : p.en}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">{isHi ? 'मात्रा' : 'Quantity'}</Label>
+              <Input value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} placeholder="5 kg" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{isHi ? 'विक्रेता नाम (हिंदी) *' : 'Seller Name (Hindi) *'}</Label>
+              <Input value={form.sellerNameHi} onChange={e => setForm(f => ({ ...f, sellerNameHi: e.target.value }))} placeholder="नाम" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{isHi ? 'विक्रेता नाम (अंग्रेज़ी)' : 'Seller Name (English)'}</Label>
+              <Input value={form.sellerNameEn} onChange={e => setForm(f => ({ ...f, sellerNameEn: e.target.value }))} placeholder="Name" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">{isHi ? 'फ़ोन नंबर *' : 'Phone Number *'}</Label>
+              <Input value={form.sellerPhone} onChange={e => setForm(f => ({ ...f, sellerPhone: e.target.value }))} placeholder="10-digit mobile" inputMode="tel" maxLength={10} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{isHi ? 'वार्ड नंबर' : 'Ward Number'}</Label>
+              <Input type="number" min={1} max={15} value={form.sellerWard} onChange={e => setForm(f => ({ ...f, sellerWard: e.target.value }))} placeholder="1-15" inputMode="numeric" />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground bg-muted/50 rounded-md p-2">
+            {isHi
+              ? '📝 आपकी सूची अधिकृत (admin approve) होने के बाद सार्वजनिक रूप से दिखाई देगी।'
+              : '📝 Your listing will be publicly visible after admin approval.'}
+          </p>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">{isHi ? 'रद्द करें' : 'Cancel'}</Button>
+          </DialogClose>
+          <Button onClick={handleSubmit} disabled={submitting} className="gap-1.5">
+            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isHi ? 'सूची जोड़ें' : 'Add Listing'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ── Component ──────────────────────────────────────────────────────────
 export function VillageMarketplace() {
   const { locale } = useI18n()
@@ -105,23 +281,24 @@ export function VillageMarketplace() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [priceTypeFilter, setPriceTypeFilter] = useState<string | null>(null)
 
-  useEffect(() => {
-    const fetchItems = async () => {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams()
-        if (categoryFilter !== 'all') params.set('category', categoryFilter)
-        const r = await fetch(`/api/marketplace?${params.toString()}`, { cache: 'no-store' })
-        if (!r.ok) throw new Error('fetch_failed')
-        const d = await r.json()
-        setItems(d.items || [])
-        setStats(d.stats || { total: 0, categories: 0, active: 0, thisWeek: 0 })
-      } catch {
-        setItems([])
-      } finally {
-        setLoading(false)
-      }
+  const fetchItems = async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (categoryFilter !== 'all') params.set('category', categoryFilter)
+      const r = await fetch(`/api/marketplace?${params.toString()}`, { cache: 'no-store' })
+      if (!r.ok) throw new Error('fetch_failed')
+      const d = await r.json()
+      setItems(d.items || [])
+      setStats(d.stats || { total: 0, categories: 0, active: 0, thisWeek: 0 })
+    } catch {
+      setItems([])
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
     fetchItems()
   }, [categoryFilter])
 
@@ -192,7 +369,7 @@ export function VillageMarketplace() {
           </div>
         </ScrollReveal>
 
-        {/* ── Category filter chips ─────────────────────────────────── */}
+        {/* ── Category filter chips + Add Listing button ─────────────── */}
         <ScrollReveal delay={0.12}>
           <div className="flex flex-wrap items-center gap-2 mb-4 justify-center">
             <span className="text-xs font-medium text-muted-foreground mr-1">
@@ -217,6 +394,11 @@ export function VillageMarketplace() {
             })}
           </div>
         </ScrollReveal>
+
+        {/* ── Add New Listing button ─────────────────────────────────── */}
+        <div className="flex justify-center mb-6">
+          <AddListingDialog isHi={isHi} onCreated={fetchItems} />
+        </div>
 
         {/* ── Price type filter chips ────────────────────────────────── */}
         <ScrollReveal delay={0.16}>

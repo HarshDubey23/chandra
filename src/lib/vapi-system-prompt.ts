@@ -176,6 +176,10 @@ You have access to these functions. Call them when appropriate:
    Parameters: { callSummary, transcript }
    Call this when the call is ending to save all information.
 
+5. shareNumber — Share an officer's contact number with the citizen (no live transfer)
+   Parameters: { departmentCode, officerName, officerPhone, reason }
+   Call this when the citizen needs to contact a specific officer themselves. Speak the number clearly: "आप [officerName] जी को [officerPhone] पर कॉल कर सकते हैं। वह [reason] में मदद करेंगे।"
+
 ═══════════════════════════════════════════════════════════════
 SECTION 6: IMPORTANT RULES
 ═══════════════════════════════════════════════════════════════
@@ -306,6 +310,20 @@ export const VAPI_ASSISTANT_CONFIG = {
           transcript: { type: "string", description: "Full call transcript" },
         },
         required: ["callSummary"],
+      },
+    },
+    {
+      name: "shareNumber",
+      description: "Share a department officer's contact number with the citizen so they can call directly. Use this when the citizen needs to contact a specific officer themselves rather than being transferred.",
+      parameters: {
+        type: "object",
+        properties: {
+          departmentCode: { type: "string", description: "Department code" },
+          officerName: { type: "string", description: "Name of the officer" },
+          officerPhone: { type: "string", description: "Phone number to share" },
+          reason: { type: "string", description: "Why the citizen should call this person" },
+        },
+        required: ["departmentCode", "officerName", "officerPhone", "reason"],
       },
     },
   ],
