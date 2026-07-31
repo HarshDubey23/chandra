@@ -596,6 +596,9 @@ async function handleTransferCall(params: TransferCallParams, toolCallId?: strin
     officerPhone: finalOfficerPhone,
     departmentCode,
     callRecordId,
+    // Vapi transfer format: returning a "number" field triggers Vapi to dial it
+    // The number must be in E.164 format (+91XXXXXXXXXX)
+    number: finalOfficerPhone ? `+91${finalOfficerPhone.replace(/\D/g, '').slice(-10)}` : undefined,
     message: `कॉल ${finalOfficerName} (${finalOfficerPhone}) को ट्रांसफर की जा रही है।`,
   })
 }
