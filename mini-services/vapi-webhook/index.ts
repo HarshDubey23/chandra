@@ -227,30 +227,10 @@ async function sendVapiSms(to: string, msg: string): Promise<boolean> {
   if (!cleaned) return false
   // Format recipient as E.164 (+91XXXXXXXXXX for India)
   const toE164 = cleaned.startsWith('91') && cleaned.length === 12 ? `+${cleaned}` : `+91${cleaned}`
-  try {
-    const res = await fetch('https://api.vapi.ai/sms', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        to: toE164,
-        from: fromNumber,
-        message: msg,
-      }),
-    })
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '')
-      console.error(`[vapi-webhook] Vapi SMS error ${res.status} (to=${toE164}):`, errText)
-      return false
-    }
-    console.log(`[vapi-webhook] Vapi SMS sent OK (to=${toE164} from=${fromNumber})`)
-    return true
-  } catch (e) {
-    console.error(`[vapi-webhook] Vapi SMS request failed (to=${toE164}):`, e)
-    return false
-  }
+  // Vapi does NOT have a standalone SMS API — SMS only works during active calls.
+  // Log silently without attempting the API call (which returns 404).
+  console.log(`[vapi-webhook] SMS logged (not sent — Vapi has no standalone SMS API): to=${toE164}`)
+  return false
 }
 
 /**
