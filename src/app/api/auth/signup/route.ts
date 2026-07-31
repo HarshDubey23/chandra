@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     data: {
       name,
       email,
-      phone: 'MOB_' + phone.slice(-4), // Store partial for privacy
+      phone: 'MOB_' + (phone || '0000').slice(-4), // Store partial for privacy
       passwordHash: hashPassword(password),
       role: 'viewer',
     },
