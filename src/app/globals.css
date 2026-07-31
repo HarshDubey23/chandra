@@ -2884,11 +2884,9 @@ section[id] {
   content-visibility: auto;
   contain-intrinsic-size: auto 1000px;
 }
-/* Auto-apply to all portal sections except hero (skips off-screen rendering) */
-section[id]:not(#hero):not(#activity-feed) {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 500px;
-}
+/* REMOVED: Auto content-visibility on all sections was causing blank areas
+   when scrolling fast or on slow paint. Reverted to normal rendering.
+   Performance is fine without it since we removed Lenis + grain + mesh blur. */
 
 /* ── GPU layer promotion for actively animating elements ── */
 .gpu-layer {
