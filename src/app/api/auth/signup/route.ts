@@ -55,14 +55,14 @@ export async function POST(req: NextRequest) {
 
   // ── Send WhatsApp notification to admin about new registration ──
   // This calls the vapi-webhook mini-service which dispatches via Meta/Twilio/mock
-  const adminWhatsapp = process.env.ADMIN_WHATSAPP || '919651035021'
+  const adminPhone = process.env.ADMIN_PHONE || '919651035021'
   const webhookBase = process.env.VAPI_WEBHOOK_BASE || 'http://localhost:3003'
   const message = `🆕 नया निवासी पंजीकरण / New Resident Registration\n\nनाम/Name: ${name}\nईमेल/Email: ${email}\nफोन/Phone: +91 ${phone}\n\nकृपया सत्यापित करें / Please verify.\n— ग्राम पंचायत चंद्रा`
   try {
     await fetch(`${webhookBase}/send-whatsapp?XTransformPort=3003`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: adminWhatsapp, message }),
+      body: JSON.stringify({ to: adminPhone, message }),
     })
   } catch {
     // Non-fatal — registration succeeds even if WhatsApp fails

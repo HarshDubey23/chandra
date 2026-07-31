@@ -175,88 +175,60 @@ function broadcastEvent(event: string, payload: unknown): void {
 }
 
 /**
- * Send a real WhatsApp message to a specific phone number via the Meta Cloud API.
- * Returns true on success, false on any failure (caller falls back to log).
- * Requires env: WHATSAPP_TOKEN, WHATSAPP_PHONE_ID.
+ * REMOVED: Meta Cloud API + Twilio WhatsApp. Now using Vapi SMS exclusively.
+ * See sendVapiSms() below for the Vapi phone number SMS implementation.
  */
-async function sendWhatsAppCloudApi(to: string, msg: string): Promise<boolean> {
-  const token = process.env.WHATSAPP_TOKEN || ''
-  const phoneId = process.env.WHATSAPP_PHONE_ID || ''
-  if (!token || !phoneId) {
+
+/**
+ * Send SMS via Vapi phone number API.
+ * Uses your Vapi phone number (+1 618 221 8137) to send SMS to any number.
+ * Requires env: VAPI_API_KEY, VAPI_PHONE_NUMBER
+ * Returns true on success, false on failure.
+ *
+ * API: POST https://api.vapi.ai/sms
+ * Body: { to, from, message }
+ * Auth: Bearer VAPI_API_KEY
+ */
+async function sendVapiSms(to: string, msg: string): Promise<boolean> {
+  const apiKey = process.env.VAPI_API_KEY || ''
+  const fromNumber = process.env.VAPI_PHONE_NUMBER || ''
+  if (!apiKey || !fromNumber) {
+    console.warn('[vapi-webhook] Vapi SMS not configured — set VAPI_API_KEY + VAPI_PHONE_NUMBER in .env')
     return false
   }
   const cleaned = to.replace(/[^\d]/g, '')
   if (!cleaned) return false
+  // Format recipient as E.164 (+91XXXXXXXXXX for India)
+  const toE164 = cleaned.startsWith('91') && cleaned.length === 12 ? `+${cleaned}` : `+91${cleaned}`
   try {
-    const res = await fetch(`https://graph.facebook.com/v25.0/${phoneId}/messages`, {
+    const res = await fetch('https://api.vapi.ai/sms', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: cleaned,
-        type: 'text',
-        text: { preview_url: false, body: msg },
+        to: toE164,
+        from: fromNumber,
+        message: msg,
       }),
-    })
-    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
-    if (!res.ok) {
-      console.error(`[vapi-webhook] WhatsApp API error ${res.status} (to=${cleaned}):`, JSON.stringify(data))
-      return false
-    }
-    console.log(`[vapi-webhook] WhatsApp sent OK (to=${cleaned}):`, JSON.stringify(data))
-    return true
-  } catch (e) {
-    console.error(`[vapi-webhook] WhatsApp API request failed (to=${cleaned}):`, e)
-    return false
-  }
-}
-
-/**
- * Send WhatsApp via Twilio API (alternative provider).
- * Requires env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM
- * Returns true on success, false on failure.
- */
-async function sendWhatsAppTwilio(to: string, msg: string): Promise<boolean> {
-  const sid = process.env.TWILIO_ACCOUNT_SID || ''
-  const authToken = process.env.TWILIO_AUTH_TOKEN || ''
-  const from = process.env.TWILIO_WHATSAPP_FROM || '' // e.g. whatsapp:+14155238886
-  if (!sid || !authToken || !from) return false
-  const cleaned = to.replace(/[^\d]/g, '')
-  if (!cleaned) return false
-  try {
-    const auth = Buffer.from(`${sid}:${authToken}`).toString('base64')
-    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        From: from,
-        To: `whatsapp:+${cleaned}`,
-        Body: msg,
-      }).toString(),
     })
     if (!res.ok) {
       const errText = await res.text().catch(() => '')
-      console.error(`[vapi-webhook] Twilio WhatsApp error ${res.status} (to=${cleaned}):`, errText)
+      console.error(`[vapi-webhook] Vapi SMS error ${res.status} (to=${toE164}):`, errText)
       return false
     }
-    console.log(`[vapi-webhook] Twilio WhatsApp sent OK (to=${cleaned})`)
+    console.log(`[vapi-webhook] Vapi SMS sent OK (to=${toE164} from=${fromNumber})`)
     return true
   } catch (e) {
-    console.error(`[vapi-webhook] Twilio WhatsApp request failed (to=${cleaned}):`, e)
+    console.error(`[vapi-webhook] Vapi SMS request failed (to=${toE164}):`, e)
     return false
   }
 }
 
 /**
- * Dispatch notification — Vapi-only mode (no WhatsApp).
- * Logs to outbox file for audit trail. Notifications are sent via Vapi
- * call-transfer + Vapi SMS (if configured in Vapi dashboard).
+ * Dispatch notification via Vapi SMS (from your Vapi phone number).
+ * Falls back to audit-log if VAPI_API_KEY not set.
  */
 async function dispatchWhatsApp(to: string, msg: string): Promise<void> {
   const cleaned = to.replace(/[^\d]/g, '')
@@ -264,9 +236,10 @@ async function dispatchWhatsApp(to: string, msg: string): Promise<void> {
     console.warn('[vapi-webhook] dispatchNotification: skipping empty recipient')
     return
   }
-  // Log to outbox for audit (no actual WhatsApp send — Vapi-only setup)
-  logWhatsAppToOutbox(msg, cleaned, 'vapi-logged')
-  console.log(`[vapi-webhook] Notification logged (to=${cleaned}): ${msg.substring(0, 60)}...`)
+  // Try Vapi SMS (from your Vapi phone number)
+  const sent = await sendVapiSms(cleaned, msg)
+  // Always log to outbox for audit trail
+  logWhatsAppToOutbox(msg, cleaned, sent ? 'vapi-sms-sent' : 'vapi-sms-pending')
 }
 
 // ─── JSON helper ──────────────────────────────────────────────────────────
@@ -1128,10 +1101,9 @@ const server = Bun.serve({
       })
     }
 
-    // GET /whatsapp-status → which WhatsApp provider is active + recent outbox
+    // GET /sms-status → Vapi SMS config status + recent outbox
     if (req.method === 'GET' && path === '/whatsapp-status') {
-      const metaConfigured = !!(process.env.WHATSAPP_TOKEN && process.env.WHATSAPP_PHONE_ID)
-      const twilioConfigured = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM)
+      const vapiSmsConfigured = !!(process.env.VAPI_API_KEY && process.env.VAPI_PHONE_NUMBER)
       let recentOutbox: string[] = []
       try {
         const log = readFileSync(OUTBOX_LOG, 'utf-8').split('\n').filter(Boolean).slice(-5)
@@ -1139,12 +1111,12 @@ const server = Bun.serve({
       } catch { /* no outbox yet */ }
       return json({
         ok: true,
-        providers: {
-          meta: { configured: metaConfigured, phoneId: process.env.WHATSAPP_PHONE_ID ? 'set' : 'missing' },
-          twilio: { configured: twilioConfigured, from: process.env.TWILIO_WHATSAPP_FROM || 'missing' },
-        },
-        activeProvider: metaConfigured ? 'meta' : (twilioConfigured ? 'twilio' : 'mock'),
-        adminWhatsapp: process.env.ADMIN_WHATSAPP || 'not set',
+        provider: 'vapi-sms',
+        configured: vapiSmsConfigured,
+        fromNumber: process.env.VAPI_PHONE_NUMBER || 'not set',
+        apiKeySet: !!process.env.VAPI_API_KEY,
+        activeProvider: vapiSmsConfigured ? 'vapi-sms' : 'pending-config',
+        adminPhone: process.env.ADMIN_PHONE || 'not set',
         recentOutbox,
       })
     }
