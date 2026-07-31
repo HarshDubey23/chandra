@@ -253,20 +253,20 @@ async function sendWhatsAppTwilio(to: string, msg: string): Promise<boolean> {
   }
 }
 
-/** Dispatch WhatsApp to a specific recipient. Tries Meta → Twilio → mock log. */
+/**
+ * Dispatch notification — Vapi-only mode (no WhatsApp).
+ * Logs to outbox file for audit trail. Notifications are sent via Vapi
+ * call-transfer + Vapi SMS (if configured in Vapi dashboard).
+ */
 async function dispatchWhatsApp(to: string, msg: string): Promise<void> {
   const cleaned = to.replace(/[^\d]/g, '')
   if (!cleaned) {
-    console.warn('[vapi-webhook] dispatchWhatsApp: skipping empty recipient')
+    console.warn('[vapi-webhook] dispatchNotification: skipping empty recipient')
     return
   }
-  // Try Meta Cloud API first
-  let sent = await sendWhatsAppCloudApi(cleaned, msg)
-  // Fallback to Twilio if Meta not configured / failed
-  if (!sent) {
-    sent = await sendWhatsAppTwilio(cleaned, msg)
-  }
-  logWhatsAppToOutbox(msg, cleaned, sent ? 'sent' : 'mock')
+  // Log to outbox for audit (no actual WhatsApp send — Vapi-only setup)
+  logWhatsAppToOutbox(msg, cleaned, 'vapi-logged')
+  console.log(`[vapi-webhook] Notification logged (to=${cleaned}): ${msg.substring(0, 60)}...`)
 }
 
 // ─── JSON helper ──────────────────────────────────────────────────────────
