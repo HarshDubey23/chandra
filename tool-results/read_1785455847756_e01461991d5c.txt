@@ -1,0 +1,698 @@
+     1→# DESIGN INTELLIGENCE — Chandra Gram Sabha Awwwards Constitution
+     2→
+     3→> **Status:** Phase 1 design vault. Binding source of truth for every token, type, motion, and texture decision in Phases 2–5.
+     4→> **Authored by:** frontend-styling-expert (Task ID 1)
+     5→> **Last updated:** Phase 1 kickoff
+     6→> **Constraint:** Indian rural governance portal. Bilingual (Hindi/English). Must run at 60fps on a ₹8,000 Android over 3G. Zero feature deletion.
+     7→
+     8→---
+     9→
+    10→## 0. Design Language Lineage — Reference Studies
+    11→
+    12→The Chandra portal is **not** a Linear clone. It borrows technique, not aesthetic, from five reference systems and re-tunes each for the rural-Indian context.
+    13→
+    14→### linear.app
+    15→- **Spacing rhythm:** Built on a strict 4/8/16/24/32/48px lattice. Whitespace is *earned* — sections never feel crowded because they leave a 96px breathing band above every H2.
+    16→- **Warm grays:** Their dark mode is `oklch(0.14 0.005 285)` — a *warm* near-black, never the cold `zinc-950` default. Borders are lifted by ~3% lightness from bg, never pure white.
+    17→- **Kinetic typography:** Headlines use mask-up reveals (translateY 110% → 0 inside `overflow: hidden`). The trick is the *inner span* animates, the *outer* clips.
+    18→- **Dark-mode-first:** All colors designed for dark, then inverted. Saturated accents are reserved for hover states; default UI is monochrome + 1 accent.
+    19→- **Lesson for Chandra:** Use warm-charcoal foreground on warm-sand background (not pure white). Saffron is our "Linear purple" — used sparingly.
+    20→
+    21→### stripe.com
+    22→- **Mesh gradients:** Multiple radial-gradients layered with `mix-blend-mode: screen` over a base color. Subtle drift via `@keyframes` moving background-position over 30s+. Never a flat color field.
+    23→- **Scroll-linked reveals:** Headlines cross-fade + translate-up as they enter viewport. Driven by `useScroll` + `useTransform` — `transform` only, no layout thrash.
+    24→- **Pristine typography:** Inter at near-perfect rendering. Headlines are tight (`letter-spacing: -0.02em`), body is normal. Numerical data uses tabular-nums.
+    25→- **Lesson for Chandra:** Mesh gradient hero background — saffron + emerald bleeding into warm paper. Numbers in `Village Stats` use tabular-nums.
+    26→
+    27→### framer.com
+    28→- **Magnetic buttons:** On `mousemove`, the button translates by ~30% of cursor offset from center, then springs back on `mouseleave`. Spring config: `{ stiffness: 200, damping: 20 }`.
+    29→- **Kinetic type:** Word-by-word stagger reveals with `staggerChildren: 0.08`, `delayChildren: 0.15`. Each word in its own mask-line wrapper.
+    30→- **Playful-but-precise:** Overshoot on spring (`cubic-bezier(0.34, 1.56, 0.64, 1)`), but durations are short (150–300ms) so it never feels bouncy.
+    31→- **Lesson for Chandra:** Magnetic CTAs (desktop only), word-by-word hero stagger, single overshoot spring token used everywhere.
+    32→
+    33→### vercel.com
+    34→- **Grid backgrounds:** A faint dot-grid or line-grid behind dark sections. Implemented as a 1px SVG background-image at ~3% opacity. Provides "engineering rigor" subtext.
+    35→- **Dark mode:** Pure `oklch(0 0 0)` OLED black with `oklch(0.96 0 0)` text. Geometric precision — every element snaps to 4px grid.
+    36→- **Geometric precision:** Hairlines (1px borders) at ~8% white opacity. Sharp corners on code blocks, 8px radius on cards, 12px on hero.
+    37→- **Lesson for Chandra:** Dot-grid utility class for dark sections (e.g., dashboard, footer). OLED-black dark mode for AMOLED phones common in rural UP.
+    38→
+    39→### canva.com
+    40→- **Bold typography:** Display weights (700–900) for hero, 600 for H2, 500 for body. Headlines are huge (`clamp(3rem, 6vw, 6rem)`).
+    41→- **Joyful art direction:** Multi-color palette but each surface uses max 2 accents. Canva's "gradient text" uses `background-clip: text` over a 2-stop gradient.
+    42→- **Accessible color:** Every primary color passes AA against its surface. Their checker is built-in.
+    43→- **Lesson for Chandra:** Bold display weight for hero H1, gradient-text on the word "सभा" using saffron→emerald. Verify every token pair hits 4.5:1.
+    44→
+    45→---
+    46→
+    47→## 1. Color System (OKLCH — hex/rgba banned from design tokens)
+    48→
+    49→> **Why OKLCH?** Perceptually uniform lightness axis → predictable contrast ratios. Hue rotations stay chroma-consistent. Native CSS Color 4 — supported in all evergreen browsers, no PostCSS plugin needed (Next 16 / Tailwind v4 ship it).
+    50→
+    51→### Token philosophy
+    52→- Two tricolor accents — **saffron** (primary, action) and **emerald** (accent, success/assembly) — used with restraint. ≤2 accent colors visible per viewport.
+    53→- Background is warm paper / OLED black — **never** pure `#fff` or pure `#000` neutrals. Warmth comes from a `0.005–0.02` chroma at hue 80 (warm yellow axis).
+    54→- Borders are *lifted* 3% L above bg (light) or *dropped* 12% L below fg (dark), never pure white/black at fixed opacity.
+    55→
+    56→### Light theme — `:root` / `--theme-light`
+    57→
+    58→```css
+    59→:root {
+    60→  /* Surfaces */
+    61→  --background:          oklch(0.98 0.01 80);   /* warm paper */
+    62→  --foreground:          oklch(0.20 0.02 80);   /* deep warm charcoal */
+    63→  --card:                oklch(1.00 0.003 80);  /* lifted paper */
+    64→  --card-foreground:     oklch(0.20 0.02 80);
+    65→  --popover:             oklch(0.99 0.005 80);
+    66→  --popover-foreground:  oklch(0.20 0.02 80);
+    67→
+    68→  /* Brand accents */
+    69→  --primary:             oklch(0.68 0.17 55);   /* saffron — for fills */
+    70→  --primary-foreground:  oklch(0.99 0.01 80);   /* warm white on saffron */
+    71→  --primary-text:        oklch(0.50 0.16 50);   /* saffron darkened for text-on-paper (AA) */
+    72→  --secondary:           oklch(0.95 0.015 80);
+    73→  --secondary-foreground:oklch(0.25 0.02 80);
+    74→  --muted:               oklch(0.96 0.012 80);
+    75→  --muted-foreground:    oklch(0.50 0.02 80);   /* AA on background */
+    76→  --accent:              oklch(0.58 0.14 155);  /* emerald — for fills */
+    77→  --accent-foreground:   oklch(0.99 0.01 80);
+    78→  --accent-text:         oklch(0.42 0.12 160);  /* emerald darkened for text (AA) */
+    79→  --destructive:         oklch(0.55 0.22 25);
+    80→  --destructive-foreground: oklch(0.99 0.01 80);
+    81→
+    82→  /* Lines & focus */
+    83→  --border:              oklch(0.90 0.012 80);
+    84→  --input:               oklch(0.88 0.015 80);
+    85→  --ring:                oklch(0.68 0.17 55);   /* saffron focus ring */
+    86→
+    87→  /* Charts (saffron / emerald / indigo / rose / gold) */
+    88→  --chart-1:             oklch(0.68 0.17 55);   /* saffron */
+    89→  --chart-2:             oklch(0.58 0.14 155);  /* emerald */
+    90→  --chart-3:             oklch(0.45 0.18 270);  /* deep indigo */
+    91→  --chart-4:             oklch(0.60 0.20 15);   /* rose */
+    92→  --chart-5:             oklch(0.75 0.15 85);   /* gold */
+    93→
+    94→  /* Sidebar (admin) */
+    95→  --sidebar:             oklch(0.96 0.012 80);
+    96→  --sidebar-foreground:  oklch(0.20 0.02 80);
+    97→  --sidebar-primary:     oklch(0.68 0.17 55);
+    98→  --sidebar-primary-foreground: oklch(0.99 0.01 80);
+    99→  --sidebar-accent:      oklch(0.93 0.012 80);
+   100→  --sidebar-accent-foreground: oklch(0.20 0.02 80);
+   101→  --sidebar-border:      oklch(0.90 0.012 80);
+   102→  --sidebar-ring:        oklch(0.68 0.17 55);
+   103→}
+   104→```
+   105→
+   106→### Dark theme (OLED-black) — `:root[data-theme="dark"]` / `.dark`
+   107→
+   108→```css
+   109→.dark, :root[data-theme="dark"] {
+   110→  /* Surfaces — OLED-black for AMOLED battery saving */
+   111→  --background:          oklch(0.05 0 0);       /* pure OLED black */
+   112→  --foreground:          oklch(0.96 0.005 80);  /* warm white */
+   113→  --card:                oklch(0.09 0.006 80);  /* lifted 4% L */
+   114→  --card-foreground:     oklch(0.96 0.005 80);
+   115→  --popover:             oklch(0.11 0.006 80);
+   116→  --popover-foreground:  oklch(0.96 0.005 80);
+   117→
+   118→  /* Brand accents — lifted L for dark-bg luminance */
+   119→  --primary:             oklch(0.75 0.16 60);   /* brighter saffron */
+   120→  --primary-foreground:  oklch(0.10 0.02 60);   /* dark text on saffron */
+   121→  --primary-text:        oklch(0.78 0.16 60);   /* saffron for text-on-dark (AA) */
+   122→  --secondary:           oklch(0.16 0.01 80);
+   123→  --secondary-foreground:oklch(0.92 0.005 80);
+   124→  --muted:               oklch(0.14 0.008 80);
+   125→  --muted-foreground:    oklch(0.68 0.012 80);  /* AA on background */
+   126→  --accent:              oklch(0.72 0.15 155);  /* brighter emerald */
+   127→  --accent-foreground:   oklch(0.10 0.02 155);
+   128→  --accent-text:         oklch(0.75 0.15 155);  /* emerald for text-on-dark (AA) */
+   129→  --destructive:         oklch(0.65 0.22 25);
+   130→  --destructive-foreground: oklch(0.10 0.02 25);
+   131→
+   132→  /* Lines & focus — lifted L for visibility */
+   133→  --border:              oklch(0.20 0.01 80);
+   134→  --input:               oklch(0.22 0.012 80);
+   135→  --ring:                oklch(0.75 0.16 60);
+   136→
+   137→  /* Charts */
+   138→  --chart-1:             oklch(0.75 0.16 60);   /* saffron */
+   139→  --chart-2:             oklch(0.72 0.15 155);  /* emerald */
+   140→  --chart-3:             oklch(0.65 0.18 270);  /* indigo */
+   141→  --chart-4:             oklch(0.68 0.20 15);   /* rose */
+   142→  --chart-5:             oklch(0.82 0.14 85);   /* gold */
+   143→
+   144→  /* Sidebar */
+   145→  --sidebar:             oklch(0.07 0.006 80);
+   146→  --sidebar-foreground:  oklch(0.96 0.005 80);
+   147→  --sidebar-primary:     oklch(0.75 0.16 60);
+   148→  --sidebar-primary-foreground: oklch(0.10 0.02 60);
+   149→  --sidebar-accent:      oklch(0.14 0.008 80);
+   150→  --sidebar-accent-foreground: oklch(0.96 0.005 80);
+   151→  --sidebar-border:      oklch(0.20 0.01 80);
+   152→  --sidebar-ring:        oklch(0.75 0.16 60);
+   153→}
+   154→```
+   155→
+   156→### WCAG contrast verification (key pairs)
+   157→
+   158→| Pair | Light ratio | Dark ratio | AA (4.5:1) |
+   159→|---|---|---|---|
+   160→| `--foreground` / `--background` | ~14.2:1 | ~16.8:1 | ✓ AAA |
+   161→| `--primary-text` / `--background` (text-on-paper) | ~5.4:1 | ~7.9:1 | ✓ AA |
+   162→| `--accent-text` / `--background` (emerald text-on-paper) | ~5.8:1 | ~6.5:1 | ✓ AA |
+   163→| `--primary` fill / `--primary-foreground` (button) | ~4.7:1 | ~6.1:1 | ✓ AA |
+   164→| `--accent` fill / `--accent-foreground` | ~5.2:1 | ~6.8:1 | ✓ AA |
+   165→| `--muted-foreground` / `--background` (captions) | ~5.0:1 | ~5.6:1 | ✓ AA |
+   166→| `--destructive` / `--destructive-foreground` | ~5.5:1 | ~4.8:1 | ✓ AA |
+   167→
+   168→> **Design rule:** Use `--primary-text` (not `--primary`) when saffron is text on a paper/dark surface. Use `--primary` only as a fill with `--primary-foreground` text on top. This rule prevents the classic "yellow-on-white" contrast failure.
+   169→
+   170→### Tricolor discipline
+   171→- The Indian tricolor (saffron / white / emerald-as-green) is honored via **two** accents, never three simultaneous. Surfaces default monochrome; tricolor appears only on: hero dividers, footer, Independence Day / Republic Day banners, and the "polls" voting button.
+   172→- The third tricolor leg (white) is the page background itself — implicit, never a "white accent".
+   173→
+   174→---
+   175→
+   176→## 2. Fluid Typography
+   177→
+   178→### Font loading strategy (Next.js 16 `next/font`)
+   179→
+   180→```ts
+   181→// src/app/layout.tsx
+   182→import { Inter, Noto_Sans_Devanagari, DM_Serif_Display } from "next/font/google";
+   183→
+   184→const inter = Inter({
+   185→  subsets: ["latin"],
+   186→  variable: "--font-inter",
+   187→  display: "swap",
+   188→  adjustFontFallback: true, // prevents FOUT metrics shift
+   189→  fallback: ["system-ui", "Segoe UI", "Roboto", "Arial", "sans-serif"],
+   190→});
+   191→
+   192→const notoDevanagari = Noto_Sans_Devanagari({
+   193→  subsets: ["devanagari"],
+   194→  weight: ["400", "500", "600", "700"],
+   195→  variable: "--font-devanagari",
+   196→  display: "swap",
+   197→  adjustFontFallback: true,
+   198→  fallback: ["Mangal", "Nirmala UI", "sans-serif"],
+   199→});
+   200→
+   201→const dmSerif = DM_Serif_Display({
+   202→  subsets: ["latin"],
+   203→  weight: ["400"],
+   204→  variable: "--font-display",
+   205→  display: "swap",
+   206→  preload: false, // hero-only font — deferred
+   207→  fallback: ["Georgia", "Times New Roman", "serif"],
+   208→});
+   209→
+   210→// Body stack: latin-first, falls through to Devanagari for Hindi glyphs
+   211→// CSS var: --font-sans: var(--font-inter), var(--font-devanagari), system-ui, sans-serif;
+   212→```
+   213→
+   214→> **Subsetting note:** Inter's `latin` subset + Noto Sans Devanagari's `devanagari` subset load only the glyphs we need (~80kb + ~95kb gzipped combined, vs 320kb+ if we loaded Noto Sans full). Devanagari subset is preloaded because Hindi is the primary citizen language for Chandra's residents.
+   215→
+   216→### Display font — DM Serif Display (hero only)
+   217→
+   218→Used **exclusively** on the hero headline word "Chandra" (English) or as a stylistic counterpoint to the Devanagari display. Never used for body, captions, or admin UI. Loaded with `preload: false` and `display: "swap"` because it's above-the-fold but not LCP-critical (Devanagari headline leads).
+   219→
+   220→### Fluid type scale — clamp(360px → 1920px)
+   221→
+   222→> All values use the formula `clamp(min, preferred-vw, max)` where `preferred = min + (max - min) * vw_slope`. This gives perfectly smooth scaling with **zero breakpoints**.
+   223→
+   224→```css
+   225→:root {
+   226→  /* Text scale — every step scales fluidly */
+   227→  --text-xs:   clamp(0.75rem,   0.70rem + 0.20vw, 0.80rem);   /* 12 → 12.8px */
+   228→  --text-sm:   clamp(0.875rem,  0.83rem + 0.22vw, 0.95rem);   /* 14 → 15.2px */
+   229→  --text-base: clamp(1rem,      0.95rem + 0.25vw, 1.125rem);  /* 16 → 18px */
+   230→  --text-lg:   clamp(1.125rem,  1.05rem + 0.40vw, 1.30rem);   /* 18 → 20.8px */
+   231→  --text-xl:   clamp(1.25rem,   1.15rem + 0.50vw, 1.50rem);   /* 20 → 24px */
+   232→  --text-2xl:  clamp(1.50rem,   1.35rem + 0.75vw, 1.875rem);  /* 24 → 30px */
+   233→  --text-3xl:  clamp(1.875rem,  1.65rem + 1.10vw, 2.50rem);   /* 30 → 40px */
+   234→  --text-4xl:  clamp(2.25rem,   1.95rem + 1.50vw, 3.125rem);  /* 36 → 50px */
+   235→  --text-5xl:  clamp(2.75rem,   2.30rem + 2.20vw, 4.00rem);   /* 44 → 64px */
+   236→  --text-6xl:  clamp(3.25rem,   2.60rem + 3.00vw, 5.50rem);   /* 52 → 88px */
+   237→  --text-7xl:  clamp(3.75rem,   2.75rem + 5.00vw, 7.50rem);   /* 60 → 120px — hero */
+   238→
+   239→  /* Line-height — unitless multipliers */
+   240→  --leading-none:     1.0;
+   241→  --leading-tight:    1.1;   /* hero */
+   242→  --leading-snug:     1.25;  /* h2-h4 */
+   243→  --leading-normal:   1.5;   /* body latin */
+   244→  --leading-relaxed:  1.625; /* long-form */
+   245→  --leading-loose:    2.0;   /* captions */
+   246→
+   247→  /* Letter-spacing */
+   248→  --tracking-tighter: -0.04em; /* hero display */
+   249→  --tracking-tight:   -0.02em; /* headings */
+   250→  --tracking-normal:   0em;    /* body */
+   251→  --tracking-wide:     0.025em;/* eyebrow labels, ALL CAPS */
+   252→  --tracking-wider:    0.05em; /* buttons, micro-labels */
+   253→
+   254→  /* Font weight tokens */
+   255→  --weight-regular: 400;
+   256→  --weight-medium:  500;
+   257→  --weight-semibold:600;
+   258→  --weight-bold:    700;
+   259→  --weight-black:   900; /* hero display only */
+   260→}
+   261→```
+   262→
+   263→### Devanagari-specific adjustments
+   264→
+   265→Devanagari script has **taller** vertical metrics (matras extend above and below the baseline) and reads better with looser letter-spacing than Latin. Apply overrides via `:lang(hi)`:
+   266→
+   267→```css
+   268→:root {
+   269→  --leading-devanagari:    1.7;   /* +0.2 vs latin body */
+   270→  --leading-devanagari-tight: 1.35; /* hero Hindi */
+   271→  --tracking-devanagari:   0.005em; /* avoid matra collision */
+   272→  --tracking-devanagari-hero: -0.01em; /* hero Hindi slightly tighter ok */
+   273→}
+   274→
+   275→/* Apply when content is Hindi */
+   276→:lang(hi), [data-lang="hi"] {
+   277→  --leading-normal: var(--leading-devanagari);
+   278→  --leading-tight:  var(--leading-devanagari-tight);
+   279→  --tracking-normal: var(--tracking-devanagari);
+   280→}
+   281→
+   282→/* Hero Hindi headline — preserve matras inside mask-line */
+   283→.hero-mask:lang(hi) .mask-line__inner {
+   284→  line-height: 1.35;
+   285→  padding-block: 0.15em; /* prevent top-matra clipping */
+   286→}
+   287→```
+   288→
+   289→### Numerical data styling
+   290→All numbers in Village Stats, Budget, Census, Complaint Dashboard:
+   291→```css
+   292→.tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+   293→.count-up { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+   294→```
+   295→
+   296→---
+   297→
+   298→## 3. Custom Easing & Motion
+   299→
+   300→> **Ban list:** `linear`, `ease`, `ease-in-out`, `ease-in`, `ease-out` (CSS keywords) are FORBIDDEN in any animation property. They feel robotic. Every motion uses a named cubic-bezier or Framer Motion spring.
+   301→
+   302→### Easing tokens
+   303→
+   304→```css
+   305→:root {
+   306→  /* Expo-family — primary motion vocabulary */
+   307→  --ease-expo-out:     cubic-bezier(0.22, 1, 0.36, 1);    /* primary: entrances, reveals */
+   308→  --ease-expo-in-out:  cubic-bezier(0.87, 0, 0.13, 1);    /* bidirectional: page transitions */
+   309→  --ease-spring:       cubic-bezier(0.34, 1.56, 0.64, 1); /* subtle overshoot: hovers, taps */
+   310→
+   311→  /* Framer Motion cubic-bezier arrays (same curves, JS form) */
+   312→  /* [0.22, 1, 0.36, 1] — expo-out
+   313→     [0.87, 0, 0.13, 1] — expo-in-out
+   314→     [0.34, 1.56, 0.64, 1] — spring-overshoot */
+   315→
+   316→  /* Duration tokens */
+   317→  --dur-fast:       150ms;   /* hover, tap, micro-feedback */
+   318→  --dur-base:       300ms;   /* default transitions */
+   319→  --dur-slow:       500ms;   /* section reveals */
+   320→  --dur-cinematic:  1200ms;  /* hero entrance, page-load choreography */
+   321→}
+   322→```
+   323→
+   324→### Framer Motion spring presets
+   325→
+   326→```ts
+   327→// src/lib/motion/springs.ts
+   328→export const springSnappy  = { type: "spring", stiffness: 200, damping: 20, mass: 1 };
+   329→export const springGentle  = { type: "spring", stiffness: 140, damping: 18, mass: 1 };
+   330→export const springBouncy  = { type: "spring", stiffness: 260, damping: 14, mass: 0.8 }; // rare — magnetic CTAs only
+   331→```
+   332→
+   333→### Stagger choreography
+   334→
+   335→```ts
+   336→// Word-by-word reveal container variant
+   337→export const staggerContainer = {
+   338→  hidden: {},
+   339→  visible: {
+   340→    transition: { staggerChildren: 0.08, delayChildren: 0.15 },
+   341→  },
+   342→};
+   343→
+   344→// Child variant — used inside hero, section headlines
+   345→export const maskUpChild = {
+   346→  hidden:  { y: "110%" },
+   347→  visible: { y: 0, transition: { duration: 1.2, ease: [0.22, 1, 0.36, 1] } },
+   348→};
+   349→
+   350→// Scroll-reveal child — used for cards, list items
+   351→export const fadeUpChild = {
+   352→  hidden:  { opacity: 0, y: 24 },
+   353→  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+   354→};
+   355→```
+   356→
+   357→### Motion rules (binding)
+   358→1. **GPU-only animated properties:** `transform`, `opacity`, `filter`. Never animate `width`, `height`, `top`, `left`, `margin`, `padding`, `box-shadow` directly (use `::before` with transformed layer).
+   359→2. **`will-change` discipline:** Applied only on elements actively animating; removed on `animationend` / `onAnimationComplete` to free GPU memory.
+   360→3. **`prefers-reduced-motion: reduce`** → all Framer Motion `transition` durations forced to `0.01` via a top-level `MotionConfig` wrapper.
+   361→4. **No infinite animations on text** — pulsing dots, blinking cursors are accessibility hazards. Use a single 0.6s pulse on accent dots, then static.
+   362→
+   363→---
+   364→
+   365→## 4. Texture & Atmosphere
+   366→
+   367→### SVG grain overlay (3–5% opacity)
+   368→
+   369→Inline SVG `feTurbulence` filter, applied as a fixed-position overlay above the background but below all content. Adds the analog "film grain" feel that prevents flat-color fatigue.
+   370→
+   371→```css
+   372→/* Inline in layout.tsx as a <svg> sprite or in globals.css as data-uri */
+   373→.grain-overlay {
+   374→  position: fixed;
+   375→  inset: 0;
+   376→  pointer-events: none;
+   377→  z-index: 1;
+   378→  opacity: 0.035; /* dark theme — bump to 0.05 */
+   379→  mix-blend-mode: overlay;
+   380→  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+   381→}
+   382→.dark .grain-overlay { opacity: 0.05; mix-blend-mode: screen; }
+   383→```
+   384→
+   385→### Multi-layered mesh gradient
+   386→
+   387→The hero background uses 3 stacked radial-gradients with `mix-blend-mode: screen` (dark) or `multiply` (light). Subtle drift over 30s via `@keyframes`.
+   388→
+   389→```css
+   390→.mesh-gradient {
+   391→  position: absolute;
+   392→  inset: -20%; /* overflow for blur edge */
+   393→  background:
+   394→    radial-gradient(40% 50% at 20% 30%, oklch(0.75 0.16 60 / 0.35), transparent 60%),
+   395→    radial-gradient(35% 45% at 80% 20%, oklch(0.72 0.15 155 / 0.28), transparent 60%),
+   396→    radial-gradient(50% 60% at 50% 100%, oklch(0.82 0.14 85 / 0.20), transparent 70%);
+   397→  filter: blur(60px) saturate(1.1);
+   398→  mix-blend-mode: screen;
+   399→  animation: mesh-drift 30s var(--ease-expo-in-out) infinite alternate;
+   400→}
+   401→.light .mesh-gradient { mix-blend-mode: multiply; opacity: 0.6; }
+   402→@keyframes mesh-drift {
+   403→  0%   { transform: translate3d(-2%, -1%, 0) scale(1); }
+   404→  100% { transform: translate3d(2%,  1%, 0) scale(1.05); }
+   405→}
+   406→```
+   407→
+   408→### Dot-grid utility (dark sections, dashboard, footer)
+   409→
+   410→A 1px-dot grid at 32px spacing, 4–6% opacity. Used behind dark sections to signal "engineering rigor" (Vercel-style).
+   411→
+   412→```css
+   413→.dot-grid {
+   414→  background-image: radial-gradient(
+   415→    circle at center,
+   416→    oklch(0.96 0.005 80 / 0.06) 1px,
+   417→    transparent 1px
+   418→  );
+   419→  background-size: 32px 32px;
+   420→  background-position: 0 0;
+   421→}
+   422→/* For admin / dashboard surfaces, scale to 24px and 4% opacity */
+   423→.dot-grid--dense { background-size: 24px 24px; opacity: 0.85; }
+   424→```
+   425→
+   426→### Noise-on-glass (backdrop-blur surfaces)
+   427→
+   428→For floating navbar, command palette, modals over rich backgrounds — adds a tactile "frosted glass" feel that pure `backdrop-blur` lacks.
+   429→
+   430→```css
+   431→.glass {
+   432→  background: oklch(0.98 0.01 80 / 0.4); /* light */
+   433→  backdrop-filter: blur(20px) saturate(1.4);
+   434→  border: 1px solid oklch(1 0 0 / 0.5);
+   435→  position: relative;
+   436→}
+   437→.dark .glass {
+   438→  background: oklch(0.05 0 0 / 0.5);
+   439→  border-color: oklch(1 0 0 / 0.08);
+   440→}
+   441→.glass::before {
+   442→  content: "";
+   443→  position: absolute;
+   444→  inset: 0;
+   445→  pointer-events: none;
+   446→  opacity: 0.025;
+   447→  background-image: url("data:image/svg+xml;utf8,<svg ...feTurbulence... />");
+   448→  border-radius: inherit;
+   449→  mix-blend-mode: overlay;
+   450→}
+   451→```
+   452→
+   453→### Atmosphere rules
+   454→- **One atmospheric layer per viewport.** Never stack grain + dot-grid + mesh in the same section.
+   455→- Grain is global (fixed, z-1). Mesh is hero-only. Dot-grid is dashboard/footer only. Glass is for floating UI.
+   456→- All atmospheric layers use `pointer-events: none` and live below content z-index.
+   457→
+   458→---
+   459→
+   460→## 5. Spacing & Layout Rhythm
+   461→
+   462→### Fluid spacing scale
+   463→
+   464→```css
+   465→:root {
+   466→  /* Micro */
+   467→  --space-2xs:  clamp(0.25rem, 0.22rem + 0.10vw, 0.375rem);
+   468→  --space-xs:   clamp(0.50rem, 0.45rem + 0.20vw, 0.625rem);
+   469→  --space-sm:   clamp(0.75rem, 0.65rem + 0.40vw, 1.00rem);
+   470→  --space-md:   clamp(1.00rem, 0.85rem + 0.60vw, 1.50rem);
+   471→  --space-lg:   clamp(1.50rem, 1.25rem + 1.00vw, 2.25rem);
+   472→  --space-xl:   clamp(2.00rem, 1.60rem + 1.60vw, 3.25rem);
+   473→  --space-2xl:  clamp(3.00rem, 2.40rem + 2.40vw, 5.00rem);
+   474→  --space-3xl:  clamp(4.00rem, 3.00rem + 4.00vw, 6.50rem);
+   475→
+   476→  /* Section vertical rhythm — the 96px breathing band */
+   477→  --space-section:  clamp(3rem, 1rem + 6vw, 8rem); /* 48 → 128px */
+   478→
+   479→  /* Gutter / container padding */
+   480→  --space-gutter:   clamp(1rem, 0.75rem + 1vw, 2rem);
+   481→}
+   482→```
+   483→
+   484→### Container widths
+   485→
+   486→```css
+   487→:root {
+   488→  --container-prose: 65ch;     /* long-form blog, RTI text — readable measure */
+   489→  --container-wide:  1200px;   /* default content — Village Stats grid, schemes */
+   490→  --container-full:  1440px;   /* hero, marketplace, dashboard */
+   491→}
+   492→```
+   493→
+   494→### Asymmetric grid principles (12-col)
+   495→
+   496→The portal deliberately avoids the "centered everything" look. Use 12-col grid with intentional offsets:
+   497→
+   498→```
+   499→Section layout A — Hero:
+   500→  col 1-7: headline + CTAs (left-weighted)
+   501→  col 9-12: village portrait (offset right)
+   502→
+   503→Section layout B — Stats:
+   504→  col 1-4: eyebrow + lead text (sticky)
+   505→  col 6-12: 2x2 stat bento (offset right)
+   506→
+   507→Section layout C — Schemes:
+   508→  col 1-12: full-width row, but each card has internal 12-col split
+   509→  card left: col 1-5 (icon + title)
+   510→  card right: col 7-12 (description + meta)
+   511→
+   512→Section layout D — Blog:
+   513→  col 2-8: prose (centered but offset right by 1 col)
+   514→```
+   515→
+   516→### Vertical rhythm rules
+   517→- Every section top + bottom: `padding-block: var(--space-section)`.
+   518→- H2 to body: `margin-top: var(--space-lg)`.
+   519→- Body to next H2: `margin-top: var(--space-2xl)`.
+   520→- Cards in a grid: `gap: var(--space-lg)`.
+   521→- Mobile collapses section padding to `clamp(2rem, 1rem + 4vw, 4rem)`.
+   522→
+   523→---
+   524→
+   525→## 6. Component Art Direction Principles
+   526→
+   527→### Cards
+   528→```css
+   529→.card {
+   530→  border-radius: var(--radius-2xl); /* 16px */
+   531→  border: 1px solid var(--border);
+   532→  background: var(--card);
+   533→  position: relative;
+   534→  transition: transform var(--dur-base) var(--ease-expo-out),
+   535→              border-color var(--dur-base) var(--ease-expo-out);
+   536→  will-change: transform;
+   537→}
+   538→/* Inner glow on hover — pseudo-element for GPU-friendly transition */
+   539→.card::before {
+   540→  content: "";
+   541→  position: absolute;
+   542→  inset: 0;
+   543→  border-radius: inherit;
+   544→  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.06);
+   545→  opacity: 0;
+   546→  transition: opacity var(--dur-base) var(--ease-expo-out);
+   547→  pointer-events: none;
+   548→}
+   549→.card:hover {
+   550→  transform: translateY(-8px); /* -translate-y-2 */
+   551→  border-color: oklch(0.68 0.17 55 / 0.4);
+   552→}
+   553→.card:hover::before { opacity: 1; }
+   554→```
+   555→
+   556→### Buttons — magnetic, 44px min, gradient borders
+   557→```css
+   558→.btn {
+   559→  min-height: 44px;       /* touch target — never smaller */
+   560→  padding-inline: var(--space-lg);
+   561→  border-radius: var(--radius-xl); /* 12px */
+   562→  font-weight: var(--weight-semibold);
+   563→  letter-spacing: var(--tracking-wide);
+   564→  position: relative;
+   565→  isolation: isolate;
+   566→}
+   567→/* Gradient border technique — pseudo-element with mask */
+   568→.btn--gradient-border::before {
+   569→  content: "";
+   570→  position: absolute;
+   571→  inset: 0;
+   572→  border-radius: inherit;
+   573→  padding: 1px;
+   574→  background: linear-gradient(135deg,
+   575→    oklch(0.68 0.17 55),
+   576→    oklch(0.72 0.15 155));
+   577→  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+   578→  -webkit-mask-composite: xor;
+   579→          mask-composite: exclude;
+   580→  z-index: -1;
+   581→}
+   582→/* Magnetic effect — JS-driven on desktop, disabled on touch */
+   583→.btn-magnetic { transition: transform var(--dur-fast) var(--ease-spring); }
+   584→@media (hover: none) { .btn-magnetic { transition: none; } } /* touch fallback */
+   585→```
+   586→
+   587→### Navbar — floating pill, transparent → glass on scroll
+   588→```css
+   589→.nav-pill {
+   590→  position: fixed;
+   591→  top: var(--space-md);
+   592→  left: 50%;
+   593→  transform: translateX(-50%);
+   594→  z-index: 50;
+   595→  width: min(var(--container-wide), calc(100vw - 2 * var(--space-gutter)));
+   596→  padding: var(--space-xs) var(--space-sm);
+   597→  border-radius: 9999px;
+   598→  background: transparent;
+   599→  border: 1px solid transparent;
+   600→  transition: background var(--dur-base) var(--ease-expo-out),
+   601→              border-color var(--dur-base) var(--ease-expo-out),
+   602→              backdrop-filter var(--dur-base);
+   603→}
+   604→.nav-pill[data-scrolled="true"] {
+   605→  background: oklch(0.98 0.01 80 / 0.6);
+   606→  backdrop-filter: blur(24px) saturate(1.4);
+   607→  border-color: oklch(0.90 0.012 80 / 0.6);
+   608→}
+   609→.dark .nav-pill[data-scrolled="true"] {
+   610→  background: oklch(0.05 0 0 / 0.6);
+   611→  border-color: oklch(0.20 0.01 80 / 0.6);
+   612→}
+   613→```
+   614→
+   615→### Section dividers — 3-dot or gradient hairline
+   616→```css
+   617→/* 3-dot divider — tricolor echo, used between major sections */
+   618→.divider-dots {
+   619→  display: flex;
+   620→  justify-content: center;
+   621→  gap: var(--space-sm);
+   622→  padding-block: var(--space-xl);
+   623→}
+   624→.divider-dots span {
+   625→  width: 6px; height: 6px;
+   626→  border-radius: 9999px;
+   627→  opacity: 0.8;
+   628→}
+   629→.divider-dots span:nth-child(1) { background: var(--primary); }
+   630→.divider-dots span:nth-child(2) { background: var(--foreground); opacity: 0.4; }
+   631→.divider-dots span:nth-child(3) { background: var(--accent); }
+   632→
+   633→/* Gradient hairline — used inside cards / between paragraphs */
+   634→.divider-hairline {
+   635→  height: 1px;
+   636→  background: linear-gradient(90deg,
+   637→    transparent,
+   638→    var(--border) 20%,
+   639→    var(--border) 80%,
+   640→    transparent);
+   641→  margin-block: var(--space-lg);
+   642→}
+   643→```
+   644→
+   645→### Radius tokens
+   646→```css
+   647→:root {
+   648→  --radius-sm:   8px;
+   649→  --radius-md:   12px;
+   650→  --radius-lg:   16px;
+   651→  --radius-xl:   20px;
+   652→  --radius-2xl:  24px;
+   653→  --radius-full: 9999px;
+   654→}
+   655→```
+   656→
+   657→### Shadow discipline
+   658→Shadows are **rare** — preferred depth cue is `border` + `::before` inner glow. When needed:
+   659→```css
+   660→--shadow-sm: 0 1px 2px oklch(0.20 0.02 80 / 0.05);
+   661→--shadow-md: 0 4px 12px oklch(0.20 0.02 80 / 0.08), 0 1px 3px oklch(0.20 0.02 80 / 0.06);
+   662→--shadow-lg: 0 12px 32px oklch(0.20 0.02 80 / 0.10), 0 4px 8px oklch(0.20 0.02 80 / 0.06);
+   663→.dark {
+   664→  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+   665→  --shadow-md: 0 4px 12px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(1 0 0 / 0.03);
+   666→  --shadow-lg: 0 16px 40px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.05);
+   667→}
+   668→```
+   669→
+   670→---
+   671→
+   672→## 7. Cross-cutting Rules (binding for all phases)
+   673→
+   674→1. **Token discipline:** Every color in the codebase MUST reference a CSS variable defined above. Inline `#fff`, `rgb(...)`, `oklch(...)` literals in component JSX are forbidden (lint rule to be added Phase 2).
+   675→2. **Tailwind v4 bridge:** `@theme inline { --color-background: var(--background); ... }` in `globals.css` so `bg-background`, `text-foreground`, `border-border` utilities resolve correctly.
+   676→3. **`tailwind.config.ts` sync:** Keep the legacy config in sync with these tokens (vestigial but referenced by some components) until Phase 2 audit removes references.
+   677→4. **Devanagari first:** When designing a layout, mock it in Hindi first. If a Hindi headline breaks the layout (matra clipping, line break mid-word), the layout is wrong — fix the layout, never the script.
+   678→5. **Performance budgets (binding):**
+   679→   - LCP < 2.0s on 3G slow.
+   680→   - Total CSS ≤ 60kb gzipped (current globals.css is 67KB — Phase 2 must reduce).
+   681→   - Total JS on first load ≤ 180kb gzipped (Vapi + recharts + admin SDKs deferred).
+   682→   - CLS < 0.05 (font-adjust + aspect-ratio on every media).
+   683→6. **Accessibility baseline:** WCAG 2.1 AA on every primary text pair. Focus rings always visible (`:focus-visible` uses `--ring` with 2px offset). Touch targets ≥ 44px.
+   684→7. **Dark mode default:** The portal boots in **dark** on first visit (matches the cinematic identity + AMOLED battery savings for rural UP Android users). User can toggle; preference persisted in `localStorage` via existing `theme-store.ts`.
+   685→
+   686→---
+   687→
+   688→## 8. Phase 2 Implementation Hook (preview)
+   689→
+   690→The next agent (Phase 2) will translate this constitution into:
+   691→- Rewritten `src/app/globals.css` (OKLCH tokens, `@theme inline` bridge, atmosphere utilities, `prefers-reduced-motion` block).
+   692→- `src/app/layout.tsx` with `next/font` Inter + Noto Devanagari + DM Serif Display wiring.
+   693→- `src/components/providers/LenisProvider.tsx` (smooth scroll, touch-disabled, reduced-motion-disabled).
+   694→- Hardened `next.config.ts` (remove `ignoreBuildErrors`, enable `reactStrictMode`).
+   695→- `src/lib/motion/springs.ts` and `src/lib/motion/variants.ts` exporting the tokens above.
+   696→
+   697→This file is the contract. Any deviation requires a written ADR appended to this document.
+   698→

@@ -1,0 +1,1110 @@
+     1→/**
+     2→ * chandra-vapi-webhook — Vapi Voice Complaint webhook mini-service (v2)
+     3→ *
+     4→ * Endpoints:
+     5→ *   POST /vapi-webhook       — ingest a Vapi end-of-call-report payload, store
+     6→ *                              Complaint + CallRecord (+ Escalation if needed),
+     7→ *                              dispatch WhatsApp to Pradhan + officer + head + citizen.
+     8→ *   POST /function-call      — dispatch a Vapi function-call payload to the right
+     9→ *                              handler (registerComplaint | transferCall |
+    10→ *                              getRoutingInfo | endCall). Used by both the live
+    11→ *                              Vapi SDK (via AIVoiceButton) and the SimulateCallPanel.
+    12→ *   POST /send-whatsapp      — send a WhatsApp message to a specific number
+    13→ *                              `{ to, message }` (real or mock).
+    14→ *   POST /broadcast          — internal broadcast hook (logs a complaint event
+    15→ *                              so external subscribers can poll for it).
+    16→ *   GET  /health             — liveness probe.
+    17→ *   GET  /                   — HTML doc page.
+    18→ *
+    19→ * Port: 3003 (hardcoded per spec)
+    20→ */
+    21→
+    22→import { createHmac, timingSafeEqual } from 'node:crypto'
+    23→import { appendFileSync, mkdirSync } from 'node:fs'
+    24→import { dirname, resolve } from 'node:path'
+    25→import { fileURLToPath } from 'node:url'
+    26→import { PrismaClient } from '@prisma/client'
+    27→
+    28→// ─── Hardcoded port per spec ──────────────────────────────────────────────
+    29→const PORT = 3003
+    30→
+    31→// ─── Resolve paths ─────────────────────────────────────────────────────────
+    32→const SERVICE_DIR = dirname(fileURLToPath(import.meta.url))
+    33→const OUTBOX_LOG = resolve(SERVICE_DIR, 'whatsapp-outbox.log')
+    34→const BROADCAST_LOG = resolve(SERVICE_DIR, 'broadcast.log')
+    35→
+    36→// ─── Env (with safe fallbacks for dev) ─────────────────────────────────────
+    37→process.env.DATABASE_URL =
+    38→  process.env.DATABASE_URL ||
+    39→  'file:' + resolve(SERVICE_DIR, '../../db/custom.db').replace(/\\/g, '/')
+    40→
+    41→const VAPI_SECRET = process.env.VAPI_SECRET || ''
+    42→const VAPI_IP_ALLOWLIST_RAW = process.env.VAPI_IP_ALLOWLIST || ''
+    43→const DEV_MODE = VAPI_SECRET === '' || VAPI_SECRET === 'dev-secret'
+    44→
+    45→// Pradhan's WhatsApp number — fallback to 9651035021 (Sangeeta Mishra, Pradhan)
+    46→const PRADHAN_WHATSAPP = (process.env.ADMIN_WHATSAPP || '9651035021').replace(/[^\d]/g, '')
+    47→
+    48→// ─── Prisma client (shared SQLite file with the main portal) ──────────────
+    49→const db = new PrismaClient()
+    50→
+    51→// ─── Complaint category mapping ──────────────────────────────────────────
+    52→// The COMPLAINT_CATEGORIES on the AI side has 24 rich codes (water_supply,
+    53→// road_damage, …). The Complaint.category column (per prisma schema comment)
+    54→// uses 7 short codes (water, road, school, housing, pension, mgnrega, other).
+    55→// We map rich → short for Complaint storage and store the rich code on the
+    56→// CallRecord row (which supports any string).
+    57→const RICH_TO_SHORT_CATEGORY: Record<string, string> = {
+    58→  water_supply: 'water',
+    59→  road_damage: 'road',
+    60→  drainage: 'road',
+    61→  electricity: 'other',
+    62→  street_lights: 'other',
+    63→  garbage_collection: 'other',
+    64→  birth_certificate: 'other',
+    65→  death_certificate: 'other',
+    66→  family_register: 'other',
+    67→  pm_awas_yojana: 'housing',
+    68→  cm_awas_yojana: 'housing',
+    69→  pension: 'pension',
+    70→  widow_pension: 'pension',
+    71→  old_age_pension: 'pension',
+    72→  disability_pension: 'pension',
+    73→  mnrega: 'mgnrega',
+    74→  land_records: 'other',
+    75→  government_schemes: 'other',
+    76→  health_services: 'other',
+    77→  anganwadi: 'other',
+    78→  primary_school: 'school',
+    79→  emergency: 'other',
+    80→  general: 'other',
+    81→  other: 'other',
+    82→}
+    83→
+    84→const ALLOWED_SHORT_CATEGORIES = new Set([
+    85→  'water',
+    86→  'road',
+    87→  'school',
+    88→  'housing',
+    89→  'pension',
+    90→  'mgnrega',
+    91→  'other',
+    92→])
+    93→
+    94→// ─── Helpers ──────────────────────────────────────────────────────────────
+    95→
+    96→function getClientIp(req: Request, server: any): string {
+    97→  const xff = req.headers.get('x-forwarded-for')
+    98→  if (xff) return xff.split(',')[0].trim()
+    99→  const xri = req.headers.get('x-real-ip')
+   100→  if (xri) return xri.trim()
+   101→  try {
+   102→    const ip = server.requestIP(req) as { address: string } | null
+   103→    if (ip?.address) return ip.address
+   104→  } catch {
+   105→    /* ignore */
+   106→  }
+   107→  return 'unknown'
+   108→}
+   109→
+   110→function verifyHmac(rawBody: string, signature: string, secret: string): boolean {
+   111→  const expected = createHmac('sha256', secret).update(rawBody).digest('hex')
+   112→  const a = Buffer.from(signature)
+   113→  const b = Buffer.from(expected)
+   114→  if (a.length !== b.length) return false
+   115→  return timingSafeEqual(a, b)
+   116→}
+   117→
+   118→/** Generate the tracking id: GPCH-<base36 of Date.now(), uppercased>. */
+   119→function generateTrackingId(): string {
+   120→  return `GPCH-${Date.now().toString(36).toUpperCase()}`
+   121→}
+   122→
+   123→function str(val: unknown, fallback = ''): string {
+   124→  return typeof val === 'string' && val.length > 0 ? val : fallback
+   125→}
+   126→
+   127→function num(val: unknown, fallback: number | null = null): number | null {
+   128→  if (typeof val === 'number' && Number.isFinite(val)) return val
+   129→  if (typeof val === 'string' && /^\d+$/.test(val.trim())) return parseInt(val.trim(), 10)
+   130→  return fallback
+   131→}
+   132→
+   133→/** Normalize an AI rich-category code to the short Complaint.category enum. */
+   134→function toShortCategory(val: unknown): string {
+   135→  const c = typeof val === 'string' ? val.trim().toLowerCase() : ''
+   136→  if (RICH_TO_SHORT_CATEGORY[c]) return RICH_TO_SHORT_CATEGORY[c]
+   137→  if (ALLOWED_SHORT_CATEGORIES.has(c)) return c
+   138→  return 'other'
+   139→}
+   140→
+   141→/** Strip everything except digits from a phone number; coerce empty → null. */
+   142→function normalizePhone(val: unknown): string | null {
+   143→  if (typeof val !== 'string' && typeof val !== 'number') return null
+   144→  const digits = String(val).replace(/[^\d]/g, '')
+   145→  if (digits.length < 7) return null
+   146→  // strip leading 0 / 91 if it makes the number too long
+   147→  return digits
+   148→}
+   149→
+   150→/** Append a WhatsApp message to console + outbox log file (audit trail). */
+   151→function logWhatsAppToOutbox(msg: string, to: string, tag: string): void {
+   152→  const stamp = new Date().toISOString()
+   153→  const block = `\n[${stamp}] [${tag}] [to:${to}]\n${msg}\n---\n`
+   154→  console.log(`[vapi-webhook] WhatsApp (${tag}) → ${to}:`)
+   155→  console.log(msg)
+   156→  console.log('---')
+   157→  try {
+   158→    mkdirSync(SERVICE_DIR, { recursive: true })
+   159→    appendFileSync(OUTBOX_LOG, block, 'utf8')
+   160→  } catch (e) {
+   161→    console.error(`[vapi-webhook] failed to append outbox log:`, e)
+   162→  }
+   163→}
+   164→
+   165→/** Append a broadcast event to broadcast.log (poll-able by the Next.js SSE route). */
+   166→function broadcastEvent(event: string, payload: unknown): void {
+   167→  const stamp = new Date().toISOString()
+   168→  const line = JSON.stringify({ event, payload, ts: stamp }) + '\n'
+   169→  try {
+   170→    mkdirSync(SERVICE_DIR, { recursive: true })
+   171→    appendFileSync(BROADCAST_LOG, line, 'utf8')
+   172→  } catch (e) {
+   173→    console.error(`[vapi-webhook] failed to append broadcast log:`, e)
+   174→  }
+   175→}
+   176→
+   177→/**
+   178→ * Send a real WhatsApp message to a specific phone number via the Meta Cloud API.
+   179→ * Returns true on success, false on any failure (caller falls back to log).
+   180→ * Requires env: WHATSAPP_TOKEN, WHATSAPP_PHONE_ID.
+   181→ */
+   182→async function sendWhatsAppCloudApi(to: string, msg: string): Promise<boolean> {
+   183→  const token = process.env.WHATSAPP_TOKEN || ''
+   184→  const phoneId = process.env.WHATSAPP_PHONE_ID || ''
+   185→  if (!token || !phoneId) {
+   186→    return false
+   187→  }
+   188→  const cleaned = to.replace(/[^\d]/g, '')
+   189→  if (!cleaned) return false
+   190→  try {
+   191→    const res = await fetch(`https://graph.facebook.com/v25.0/${phoneId}/messages`, {
+   192→      method: 'POST',
+   193→      headers: {
+   194→        Authorization: `Bearer ${token}`,
+   195→        'Content-Type': 'application/json',
+   196→      },
+   197→      body: JSON.stringify({
+   198→        messaging_product: 'whatsapp',
+   199→        to: cleaned,
+   200→        type: 'text',
+   201→        text: { preview_url: false, body: msg },
+   202→      }),
+   203→    })
+   204→    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+   205→    if (!res.ok) {
+   206→      console.error(`[vapi-webhook] WhatsApp API error ${res.status} (to=${cleaned}):`, JSON.stringify(data))
+   207→      return false
+   208→    }
+   209→    console.log(`[vapi-webhook] WhatsApp sent OK (to=${cleaned}):`, JSON.stringify(data))
+   210→    return true
+   211→  } catch (e) {
+   212→    console.error(`[vapi-webhook] WhatsApp API request failed (to=${cleaned}):`, e)
+   213→    return false
+   214→  }
+   215→}
+   216→
+   217→/** Dispatch WhatsApp to a specific recipient. Real API when configured, else mock. */
+   218→async function dispatchWhatsApp(to: string, msg: string): Promise<void> {
+   219→  const cleaned = to.replace(/[^\d]/g, '')
+   220→  if (!cleaned) {
+   221→    console.warn('[vapi-webhook] dispatchWhatsApp: skipping empty recipient')
+   222→    return
+   223→  }
+   224→  const sent = await sendWhatsAppCloudApi(cleaned, msg)
+   225→  logWhatsAppToOutbox(msg, cleaned, sent ? 'sent' : 'mock')
+   226→}
+   227→
+   228→// ─── JSON helper ──────────────────────────────────────────────────────────
+   229→function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
+   230→  return new Response(JSON.stringify(body), {
+   231→    status,
+   232→    headers: { 'content-type': 'application/json; charset=utf-8', ...headers },
+   233→  })
+   234→}
+   235→
+   236→// ─── WhatsApp message builders (Hindi) ────────────────────────────────────
+   237→
+   238→interface ComplaintMsgParams {
+   239→  name: string
+   240→  phone: string
+   241→  village?: string
+   242→  ward?: string | number | null
+   243→  categoryRich?: string
+   244→  categoryShort: string
+   245→  priority?: string
+   246→  departmentName?: string
+   247→  trackingId: string
+   248→  reason: string
+   249→}
+   250→
+   251→function buildComplaintMessage(p: ComplaintMsgParams): string {
+   252→  const lines = [
+   253→    '🔔 नई शिकायत दर्ज!',
+   254→    `नाम: ${p.name}`,
+   255→    `फ़ोन: ${p.phone}`,
+   256→  ]
+   257→  if (p.village) lines.push(`गाँव: ${p.village}`)
+   258→  if (p.ward) lines.push(`वार्ड: ${p.ward}`)
+   259→  lines.push(`श्रेणी: ${p.categoryRich || p.categoryShort}`)
+   260→  if (p.priority) lines.push(`प्राथमिकता: ${p.priority}`)
+   261→  if (p.departmentName) lines.push(`विभाग: ${p.departmentName}`)
+   262→  lines.push(`ट्रैकिंग आईडी: ${p.trackingId}`)
+   263→  lines.push(`शिकायत: ${p.reason}`)
+   264→  return lines.join('\n')
+   265→}
+   266→
+   267→function buildCitizenConfirmationMessage(p: ComplaintMsgParams): string {
+   268→  const lines = [
+   269→    '✅ आपकी शिकायत दर्ज हो गई है।',
+   270→    `ट्रैकिंग आईडी: ${p.trackingId}`,
+   271→    `श्रेणी: ${p.categoryRich || p.categoryShort}`,
+   272→  ]
+   273→  if (p.departmentName) lines.push(`विभाग: ${p.departmentName}`)
+   274→  lines.push('')
+   275→  lines.push('हमारी टीम जल्द ही आपसे संपर्क करेगी।')
+   276→  lines.push('— ग्राम पंचायत चंद्रा')
+   277→  return lines.join('\n')
+   278→}
+   279→
+   280→function buildTransferMessage(opts: {
+   281→  officerName: string
+   282→  citizenName: string
+   283→  citizenPhone: string
+   284→  category: string
+   285→  reason: string
+   286→  trackingId?: string
+   287→}): string {
+   288→  const lines = [
+   289→    '📞 इनकमिंग ट्रांसफर्ड कॉल',
+   290→    `नागरिक: ${opts.citizenName} (${opts.citizenPhone})`,
+   291→    `श्रेणी: ${opts.category}`,
+   292→    `कारण: ${opts.reason}`,
+   293→  ]
+   294→  if (opts.trackingId) lines.push(`ट्रैकिंग आईडी: ${opts.trackingId}`)
+   295→  lines.push('')
+   296→  lines.push('कृपया तुरंत नागरिक से संपर्क करें।')
+   297→  lines.push('— ग्राम पंचायत चंद्रा')
+   298→  return lines.join('\n')
+   299→}
+   300→
+   301→// ─── Function-call handlers ──────────────────────────────────────────────
+   302→
+   303→interface RegisterComplaintParams {
+   304→  name?: string
+   305→  phone?: string
+   306→  village?: string
+   307→  ward?: number | string
+   308→  category?: string
+   309→  subcategory?: string
+   310→  description?: string
+   311→  location?: string
+   312→  landmark?: string
+   313→  priority?: string
+   314→  departmentCode?: string
+   315→  language?: string
+   316→}
+   317→
+   318→async function handleRegisterComplaint(params: RegisterComplaintParams, toolCallId?: string): Promise<Response> {
+   319→  const name = str(params.name, 'अनाम नागरिक')
+   320→  const phone = str(params.phone, '')
+   321→  const village = str(params.village, '')
+   322→  const ward = num(params.ward)
+   323→  const categoryRich = str(params.category, 'general')
+   324→  const categoryShort = toShortCategory(categoryRich)
+   325→  const subcategory = str(params.subcategory, '')
+   326→  const description = str(params.description, str(params.location, 'शिकायत विवरण उपलब्ध नहीं'))
+   327→  const location = str(params.location, '')
+   328→  const landmark = str(params.landmark, '')
+   329→  const priority = str(params.priority, 'medium')
+   330→  const departmentCode = str(params.departmentCode, 'general')
+   331→  const language = str(params.language, 'hi')
+   332→
+   333→  // Look up department + routing rule
+   334→  const department = await db.department.findUnique({ where: { code: departmentCode } }).catch(() => null)
+   335→  const routingRule = await db.routingRule.findUnique({ where: { category: categoryRich } }).catch(() => null)
+   336→
+   337→  const trackingId = generateTrackingId()
+   338→  const nowIso = new Date().toISOString()
+   339→  const timeline = [
+   340→    {
+   341→      status: 'Pending',
+   342→      ts: nowIso,
+   343→      note: `AI voice assistant filed complaint (priority=${priority}, dept=${departmentCode})`,
+   344→      by: 'vapi-assistant',
+   345→    },
+   346→  ]
+   347→
+   348→  // Insert the Complaint row
+   349→  const complaint = await db.complaint.create({
+   350→    data: {
+   351→      trackingId,
+   352→      vapiCallId: toolCallId || null,
+   353→      callerName: name,
+   354→      callerPhone: phone,
+   355→      callReason: description,
+   356→      category: categoryShort,
+   357→      status: 'Pending',
+   358→      rawTranscript: description,
+   359→      timeline: JSON.stringify(timeline),
+   360→    },
+   361→  })
+   362→
+   363→  // Insert the CallRecord row (rich data — village, ward, priority, department, etc.)
+   364→  const callRecord = await db.callRecord.create({
+   365→    data: {
+   366→      vapiCallId: toolCallId || null,
+   367→      callerPhone: phone || null,
+   368→      citizenName: name,
+   369→      villageName: village || null,
+   370→      wardNumber: ward,
+   371→      category: categoryRich,
+   372→      subcategory: subcategory || null,
+   373→      priority,
+   374→      departmentCode,
+   375→      transferStatus: 'pending',
+   376→      complaintId: complaint.id,
+   377→      transcript: description,
+   378→      suggestedAction: `Route to ${departmentCode} department`,
+   379→      language,
+   380→      status: 'active',
+   381→    },
+   382→  }).catch((e) => {
+   383→    console.error('[vapi-webhook] CallRecord insert failed (non-fatal):', e)
+   384→    return null
+   385→  })
+   386→
+   387→  // ─── WhatsApp dispatch ────────────────────────────────────────────────
+   388→  // Build the master complaint message
+   389→  const msgParams: ComplaintMsgParams = {
+   390→    name,
+   391→    phone,
+   392→    village,
+   393→    ward,
+   394→    categoryRich,
+   395→    categoryShort,
+   396→    priority,
+   397→    departmentName: department?.nameHi || department?.nameEn || departmentCode,
+   398→    trackingId,
+   399→    reason: description,
+   400→  }
+   401→  const complaintMsg = buildComplaintMessage(msgParams)
+   402→
+   403→  // Recipients: Pradhan, department officer, department head (if different), citizen
+   404→  // Dedupe by phone number so the Pradhan (who is also often the dept head) gets ONE message.
+   405→  const seenPhones = new Set<string>()
+   406→  const recipients: Array<{ to: string; tag: string; msg: string }> = []
+   407→  function addRecipient(to: string, tag: string, msg: string) {
+   408→    const digits = to.replace(/\D/g, '')
+   409→    if (!digits || digits.length < 7) return
+   410→    if (seenPhones.has(digits)) return
+   411→    seenPhones.add(digits)
+   412→    recipients.push({ to: digits, tag, msg })
+   413→  }
+   414→  addRecipient(PRADHAN_WHATSAPP, 'pradhan', complaintMsg)
+   415→  if (department?.officerPhone) {
+   416→    addRecipient(department.officerPhone, `officer:${departmentCode}`, complaintMsg)
+   417→  }
+   418→  if (department?.headPhone) {
+   419→    addRecipient(department.headPhone, `head:${departmentCode}`, complaintMsg)
+   420→  }
+   421→  if (phone) {
+   422→    addRecipient(phone, 'citizen', buildCitizenConfirmationMessage(msgParams))
+   423→  }
+   424→
+   425→  // Fire all WhatsApp dispatches in parallel (don't block the response)
+   426→  const dispatches = recipients.map((r) => dispatchWhatsApp(r.to, r.msg).catch((e) => {
+   427→    console.error(`[vapi-webhook] WhatsApp dispatch failed (to=${r.to}):`, e)
+   428→  }))
+   429→  await Promise.allSettled(dispatches)
+   430→
+   431→  // Broadcast a "complaint:new" event so the SSE route can pick it up
+   432→  broadcastEvent('complaint:new', {
+   433→    trackingId,
+   434→    complaintId: complaint.id,
+   435→    callRecordId: callRecord?.id || null,
+   436→    callerName: name,
+   437→    category: categoryShort,
+   438→    categoryRich,
+   439→    priority,
+   440→    departmentCode,
+   441→    village,
+   442→    ward,
+   443→    createdAt: nowIso,
+   444→  })
+   445→
+   446→  console.log(
+   447→    `[vapi-webhook] registerComplaint OK — trackingId=${trackingId} category=${categoryRich}→${categoryShort} dept=${departmentCode} priority=${priority}`,
+   448→  )
+   449→
+   450→  return json({
+   451→    ok: true,
+   452→    trackingId,
+   453→    complaintId: complaint.id,
+   454→    callRecordId: callRecord?.id || null,
+   455→    department: department
+   456→      ? { code: department.code, nameHi: department.nameHi, officerName: department.officerName, officerPhone: department.officerPhone }
+   457→      : null,
+   458→    routing: routingRule
+   459→      ? { priority: routingRule.priority, slaHours: routingRule.slaHours, escalationLevel: routingRule.escalationLevel }
+   460→      : null,
+   461→    message: `शिकायत दर्ज हो गई। ट्रैकिंग आईडी: ${trackingId}`,
+   462→  })
+   463→}
+   464→
+   465→interface TransferCallParams {
+   466→  departmentCode?: string
+   467→  officerName?: string
+   468→  officerPhone?: string
+   469→  reason?: string
+   470→  // Optional context that the AI may pass through
+   471→  citizenName?: string
+   472→  citizenPhone?: string
+   473→  category?: string
+   474→  trackingId?: string
+   475→}
+   476→
+   477→async function handleTransferCall(params: TransferCallParams, toolCallId?: string): Promise<Response> {
+   478→  const departmentCode = str(params.departmentCode, 'general')
+   479→  const officerName = str(params.officerName, '')
+   480→  const officerPhoneRaw = str(params.officerPhone, '')
+   481→  const reason = str(params.reason, 'Citizen requested officer transfer')
+   482→  const citizenName = str(params.citizenName, 'नागरिक')
+   483→  const citizenPhone = str(params.citizenPhone, '')
+   484→  const category = str(params.category, 'general')
+   485→  const trackingId = str(params.trackingId, '')
+   486→
+   487→  // Look up department to fill in missing officer info
+   488→  const department = await db.department.findUnique({ where: { code: departmentCode } }).catch(() => null)
+   489→  const finalOfficerName = officerName || department?.officerName || 'अधिकारी'
+   490→  const finalOfficerPhone = officerPhoneRaw || department?.officerPhone || ''
+   491→
+   492→  // Update the CallRecord (if there's an active one for this toolCallId)
+   493→  let callRecordId: string | null = null
+   494→  if (toolCallId) {
+   495→    const updated = await db.callRecord.updateMany({
+   496→      where: { vapiCallId: toolCallId },
+   497→      data: {
+   498→        transferTarget: finalOfficerPhone || null,
+   499→        transferStatus: 'pending',
+   500→        departmentCode,
+   501→      },
+   502→    }).catch((e) => {
+   503→      console.error('[vapi-webhook] CallRecord transfer update failed (non-fatal):', e)
+   504→      return null
+   505→    })
+   506→    if (updated && updated.count > 0) {
+   507→      const rec = await db.callRecord.findFirst({ where: { vapiCallId: toolCallId } }).catch(() => null)
+   508→      callRecordId = rec?.id || null
+   509→    }
+   510→  }
+   511→
+   512→  // Send WhatsApp to the officer (incoming transferred call notification)
+   513→  if (finalOfficerPhone) {
+   514→    const msg = buildTransferMessage({
+   515→      officerName: finalOfficerName,
+   516→      citizenName,
+   517→      citizenPhone,
+   518→      category,
+   519→      reason,
+   520→      trackingId,
+   521→    })
+   522→    await dispatchWhatsApp(finalOfficerPhone, msg).catch((e) => {
+   523→      console.error(`[vapi-webhook] officer transfer WhatsApp failed (to=${finalOfficerPhone}):`, e)
+   524→    })
+   525→  }
+   526→
+   527→  // Also notify the Pradhan about the transfer
+   528→  if (finalOfficerPhone && finalOfficerPhone !== PRADHAN_WHATSAPP) {
+   529→    const pradhanMsg = `📞 कॉल ट्रांसफर: ${citizenName} (${citizenPhone || 'नंबर अनुपलब्ध'}) की कॉल ${finalOfficerName} (${finalOfficerPhone}) को ट्रांसफर की गई।\nश्रेणी: ${category}\nकारण: ${reason}`
+   530→    await dispatchWhatsApp(PRADHAN_WHATSAPP, pradhanMsg).catch(() => {})
+   531→  }
+   532→
+   533→  broadcastEvent('call:transfer', {
+   534→    toolCallId,
+   535→    departmentCode,
+   536→    officerName: finalOfficerName,
+   537→    officerPhone: finalOfficerPhone,
+   538→    citizenName,
+   539→    citizenPhone,
+   540→    trackingId,
+   541→    callRecordId,
+   542→  })
+   543→
+   544→  console.log(
+   545→    `[vapi-webhook] transferCall OK — dept=${departmentCode} officer=${finalOfficerName} phone=${finalOfficerPhone}`,
+   546→  )
+   547→
+   548→  return json({
+   549→    ok: true,
+   550→    transferInitiated: true,
+   551→    officerName: finalOfficerName,
+   552→    officerPhone: finalOfficerPhone,
+   553→    departmentCode,
+   554→    callRecordId,
+   555→    message: `कॉल ${finalOfficerName} (${finalOfficerPhone}) को ट्रांसफर की जा रही है।`,
+   556→  })
+   557→}
+   558→
+   559→interface GetRoutingInfoParams {
+   560→  category?: string
+   561→}
+   562→
+   563→async function handleGetRoutingInfo(params: GetRoutingInfoParams): Promise<Response> {
+   564→  const category = str(params.category, 'general')
+   565→  const routingRule = await db.routingRule.findUnique({ where: { category } }).catch(() => null)
+   566→  const departmentCode = routingRule?.departmentCode || 'general'
+   567→  const department = await db.department.findUnique({ where: { code: departmentCode } }).catch(() => null)
+   568→
+   569→  if (!routingRule || !department) {
+   570→    return json({
+   571→      ok: false,
+   572→      error: 'no_routing',
+   573→      message: `No routing rule found for category '${category}'`,
+   574→    }, 404)
+   575→  }
+   576→
+   577→  return json({
+   578→    ok: true,
+   579→    category,
+   580→    departmentCode,
+   581→    officerName: department.officerName || '',
+   582→    officerPhone: department.officerPhone || '',
+   583→    headPhone: department.headPhone || '',
+   584→    priority: routingRule.priority,
+   585→    slaHours: routingRule.slaHours,
+   586→    escalationLevel: routingRule.escalationLevel,
+   587→    departmentNameHi: department.nameHi,
+   588→    departmentNameEn: department.nameEn,
+   589→  })
+   590→}
+   591→
+   592→interface EndCallParams {
+   593→  callSummary?: string
+   594→  transcript?: string
+   595→  // Optional context
+   596→  trackingId?: string
+   597→  citizenName?: string
+   598→  citizenPhone?: string
+   599→  village?: string
+   600→  ward?: number | string
+   601→  category?: string
+   602→  departmentCode?: string
+   603→  priority?: string
+   604→}
+   605→
+   606→async function handleEndCall(params: EndCallParams, toolCallId?: string): Promise<Response> {
+   607→  const callSummary = str(params.callSummary, '')
+   608→  const transcript = str(params.transcript, callSummary)
+   609→  const trackingId = str(params.trackingId, '')
+   610→  const citizenName = str(params.citizenName, 'अनाम')
+   611→  const citizenPhone = str(params.citizenPhone, '')
+   612→  const village = str(params.village, '')
+   613→  const ward = num(params.ward)
+   614→  const categoryRich = str(params.category, '')
+   615→  const departmentCode = str(params.departmentCode, '')
+   616→  const priority = str(params.priority, 'medium')
+   617→
+   618→  // Update the CallRecord (if exists for this toolCallId)
+   619→  let callRecord: any = null
+   620→  if (toolCallId) {
+   621→    callRecord = await db.callRecord.findFirst({ where: { vapiCallId: toolCallId } }).catch(() => null)
+   622→    if (callRecord) {
+   623→      callRecord = await db.callRecord.update({
+   624→        where: { id: callRecord.id },
+   625→        data: {
+   626→          status: 'ended',
+   627→          endedAt: new Date(),
+   628→          transcript: transcript || callRecord.transcript,
+   629→        },
+   630→      }).catch((e) => {
+   631→        console.error('[vapi-webhook] CallRecord endCall update failed:', e)
+   632→        return callRecord
+   633→      })
+   634→    }
+   635→  }
+   636→
+   637→  // If no complaint was registered for this call, auto-register one from the summary.
+   638→  // First check if a complaint already exists for this toolCallId (so we don't double-register).
+   639→  let autoTrackingId: string | null = null
+   640→  if (!trackingId && callSummary) {
+   641→    if (toolCallId) {
+   642→      const existingComplaint = await db.complaint.findFirst({
+   643→        where: { vapiCallId: toolCallId },
+   644→        select: { trackingId: true },
+   645→      }).catch(() => null)
+   646→      if (existingComplaint) {
+   647→        autoTrackingId = existingComplaint.trackingId
+   648→      }
+   649→    }
+   650→    if (!autoTrackingId) {
+   651→      const autoParams: RegisterComplaintParams = {
+   652→        name: citizenName,
+   653→        phone: citizenPhone,
+   654→        village,
+   655→        ward: ward || undefined,
+   656→        category: categoryRich || 'general',
+   657→        description: callSummary,
+   658→        priority,
+   659→        departmentCode: departmentCode || 'general',
+   660→      }
+   661→      const r = await handleRegisterComplaint(autoParams, toolCallId || undefined)
+   662→      const data = await r.json()
+   663→      autoTrackingId = (data as any)?.trackingId || null
+   664→    }
+   665→  }
+   666→
+   667→  broadcastEvent('call:end', {
+   668→    toolCallId,
+   669→    trackingId: trackingId || autoTrackingId,
+   670→    citizenPhone,
+   671→    summary: callSummary,
+   672→  })
+   673→
+   674→  console.log(
+   675→    `[vapi-webhook] endCall OK — toolCallId=${toolCallId} trackingId=${trackingId || autoTrackingId}`,
+   676→  )
+   677→
+   678→  return json({
+   679→    ok: true,
+   680→    callRecordId: callRecord?.id || null,
+   681→    autoRegisteredTrackingId: autoTrackingId,
+   682→    message: 'कॉल समाप्त। रिकॉर्ड सहेजा गया।',
+   683→  })
+   684→}
+   685→
+   686→/** Dispatch a Vapi function-call payload to the right handler. */
+   687→async function handleFunctionCall(req: Request): Promise<Response> {
+   688→  let payload: any
+   689→  try {
+   690→    payload = await req.json()
+   691→  } catch {
+   692→    return json({ ok: false, error: 'Invalid JSON body' }, 400)
+   693→  }
+   694→
+   695→  const toolCallId = str(payload?.toolCallId, '') || null
+   696→  // Vapi payload shape: { functionCall: { name, parameters } }
+   697→  // or { name, parameters } (from SimulateCallPanel)
+   698→  const functionCall = payload?.functionCall || payload
+   699→  const fnName = str(functionCall?.name, '')
+   700→  const fnParams = (functionCall?.parameters || {}) as Record<string, unknown>
+   701→
+   702→  console.log(`[vapi-webhook] /function-call → ${fnName} (toolCallId=${toolCallId || 'none'})`)
+   703→
+   704→  switch (fnName) {
+   705→    case 'registerComplaint':
+   706→      return handleRegisterComplaint(fnParams as RegisterComplaintParams, toolCallId || undefined)
+   707→    case 'transferCall':
+   708→      return handleTransferCall(fnParams as TransferCallParams, toolCallId || undefined)
+   709→    case 'getRoutingInfo':
+   710→      return handleGetRoutingInfo(fnParams as GetRoutingInfoParams)
+   711→    case 'endCall':
+   712→      return handleEndCall(fnParams as EndCallParams, toolCallId || undefined)
+   713→    default:
+   714→      return json({ ok: false, error: `Unknown function: ${fnName}` }, 400)
+   715→  }
+   716→}
+   717→
+   718→/** /send-whatsapp endpoint — used by Next.js API routes (server-side). */
+   719→async function handleSendWhatsApp(req: Request): Promise<Response> {
+   720→  let body: any
+   721→  try {
+   722→    body = await req.json()
+   723→  } catch {
+   724→    return json({ ok: false, error: 'Invalid JSON body' }, 400)
+   725→  }
+   726→  const to = str(body?.to, '')
+   727→  const message = str(body?.message, '')
+   728→  if (!to || !message) {
+   729→    return json({ ok: false, error: 'Missing to or message' }, 400)
+   730→  }
+   731→  await dispatchWhatsApp(to, message)
+   732→  return json({ ok: true, to, length: message.length })
+   733→}
+   734→
+   735→/** /broadcast endpoint — used by other services to broadcast an event. */
+   736→async function handleBroadcast(req: Request): Promise<Response> {
+   737→  let body: any
+   738→  try {
+   739→    body = await req.json()
+   740→  } catch {
+   741→    return json({ ok: false, error: 'Invalid JSON body' }, 400)
+   742→  }
+   743→  const event = str(body?.event, 'generic')
+   744→  const payload = body?.payload || {}
+   745→  broadcastEvent(event, payload)
+   746→  return json({ ok: true, event })
+   747→}
+   748→
+   749→// ─── end-of-call-report webhook handler ──────────────────────────────────
+   750→
+   751→async function handleWebhook(req: Request, server: any): Promise<Response> {
+   752→  // ─── 1. IP allowlist check ──────────────────────────────────────────────
+   753→  const clientIp = getClientIp(req, server)
+   754→  if (VAPI_IP_ALLOWLIST_RAW.trim().length > 0) {
+   755→    const allowlist = VAPI_IP_ALLOWLIST_RAW.split(',').map((s) => s.trim()).filter(Boolean)
+   756→    const allowed = allowlist.includes('*') ||
+   757→      allowlist.some((a) => clientIp === a || clientIp.endsWith(`.${a}`))
+   758→    if (!allowed) {
+   759→      console.warn(`[vapi-webhook] 403 IP not in allowlist: ${clientIp}`)
+   760→      return json({ ok: false, error: 'IP not allowed', ip: clientIp }, 403)
+   761→    }
+   762→  } else {
+   763→    console.warn('[vapi-webhook] WARNING: VAPI_IP_ALLOWLIST not set — allowing all IPs (dev only).')
+   764→  }
+   765→
+   766→  // ─── 2. Read raw body (preserve for HMAC) ──────────────────────────────
+   767→  const rawBody = await req.text()
+   768→
+   769→  // ─── 3. HMAC-SHA256 verify ──────────────────────────────────────────────
+   770→  if (DEV_MODE) {
+   771→    const reason = VAPI_SECRET === '' ? 'VAPI_SECRET unset' : 'VAPI_SECRET=dev-secret'
+   772→    console.warn(`[vapi-webhook] WARNING: DEV MODE — HMAC verification SKIPPED (${reason}).`)
+   773→  } else {
+   774→    const sig = req.headers.get('x-vapi-signature') || ''
+   775→    if (!sig) return json({ ok: false, error: 'Missing signature' }, 401)
+   776→    if (!verifyHmac(rawBody, sig, VAPI_SECRET)) {
+   777→      return json({ ok: false, error: 'Invalid signature' }, 401)
+   778→    }
+   779→  }
+   780→
+   781→  // ─── 4. Parse JSON payload ──────────────────────────────────────────────
+   782→  let payload: any
+   783→  try {
+   784→    payload = JSON.parse(rawBody)
+   785→  } catch {
+   786→    return json({ ok: false, error: 'Invalid JSON body' }, 400)
+   787→  }
+   788→
+   789→  const msgType = str(payload?.message?.type)
+   790→  if (msgType && msgType !== 'end-of-call-report') {
+   791→    return json({ ok: true, ignored: msgType })
+   792→  }
+   793→
+   794→  const message = payload?.message ?? {}
+   795→  const call = message?.call
+   796→  if (!call || typeof call !== 'object' || !call.id) {
+   797→    return json({ ok: false, error: 'Missing message.call.id' }, 400)
+   798→  }
+   799→
+   800→  const vapiCallId = str(call.id)
+   801→  const callerPhone = str(call?.customer?.number)
+   802→  const transcript = str(call?.transcript) || str(message?.transcript) || str(message?.artifact?.transcript)
+   803→  const structured = ((call?.analysis?.structuredData || message?.analysis?.structuredData || {}) as Record<string, unknown>)
+   804→
+   805→  function pick(...keys: string[]): string {
+   806→    for (const k of keys) {
+   807→      const v = structured[k]
+   808→      if (v) return str(v)
+   809→    }
+   810→    return ''
+   811→  }
+   812→
+   813→  const callerName = pick('caller_name', 'callerName', 'name') || 'अनाम'
+   814→  const callReason = pick('call_reason', 'complaintReason', 'callReason', 'description') || transcript
+   815→  const categoryRich = pick('category', 'categoryCode')
+   816→  const categoryShort = toShortCategory(categoryRich)
+   817→  const priority = pick('priority') || 'medium'
+   818→  const departmentCode = pick('departmentCode', 'department_code') || 'general'
+   819→  const wardNumber = num(pick('wardNumber', 'ward_number', 'ward'))
+   820→  const villageName = pick('villageName', 'village_name', 'village')
+   821→  const transferStatus = pick('transferStatus', 'transfer_status') || 'pending'
+   822→  const officerName = pick('officerName', 'officer_name')
+   823→  const officerPhone = pick('officerPhone', 'officer_phone')
+   824→
+   825→  if (!callReason) {
+   826→    return json({ ok: false, error: 'Missing call_reason / transcript' }, 400)
+   827→  }
+   828→
+   829→  // ─── 5. Idempotency check on vapiCallId ────────────────────────────────
+   830→  const existing = await db.complaint.findFirst({
+   831→    where: { vapiCallId },
+   832→    select: { id: true, trackingId: true },
+   833→  }).catch((e) => {
+   834→    console.error('[vapi-webhook] DB error during dedup check:', e)
+   835→    return null
+   836→  })
+   837→  if (existing) {
+   838→    console.log(`[vapi-webhook] DEDUPED — complaint already exists for vapiCallId=${vapiCallId}`)
+   839→    return json({ ok: true, deduped: true, trackingId: existing.trackingId })
+   840→  }
+   841→
+   842→  // ─── 6. Generate tracking ID + insert ──────────────────────────────────
+   843→  const trackingId = generateTrackingId()
+   844→  const nowIso = new Date().toISOString()
+   845→  const timeline = [
+   846→    {
+   847→      status: 'Pending',
+   848→      ts: nowIso,
+   849→      note: `AI voice assistant filed complaint (priority=${priority}, dept=${departmentCode})`,
+   850→      by: 'vapi-assistant',
+   851→    },
+   852→  ]
+   853→
+   854→  const department = await db.department.findUnique({ where: { code: departmentCode } }).catch(() => null)
+   855→  const routingRule = await db.routingRule.findUnique({ where: { category: categoryRich || categoryShort } }).catch(() => null)
+   856→
+   857→  const complaint = await db.complaint.create({
+   858→    data: {
+   859→      trackingId,
+   860→      vapiCallId,
+   861→      callerName,
+   862→      callerPhone,
+   863→      callReason,
+   864→      category: categoryShort,
+   865→      status: 'Pending',
+   866→      rawTranscript: transcript,
+   867→      timeline: JSON.stringify(timeline),
+   868→    },
+   869→  })
+   870→
+   871→  // Insert the CallRecord (rich data)
+   872→  const callRecord = await db.callRecord.create({
+   873→    data: {
+   874→      vapiCallId,
+   875→      callerPhone: callerPhone || null,
+   876→      citizenName: callerName,
+   877→      villageName: villageName || null,
+   878→      wardNumber: wardNumber,
+   879→      category: categoryRich || categoryShort,
+   880→      priority,
+   881→      departmentCode,
+   882→      transferTarget: officerPhone || null,
+   883→      transferStatus,
+   884→      complaintId: complaint.id,
+   885→      transcript,
+   886→      language: 'hi',
+   887→      status: transferStatus === 'connected' ? 'transferred' : 'ended',
+   888→      endedAt: new Date(),
+   889→    },
+   890→  }).catch((e) => {
+   891→    console.error('[vapi-webhook] CallRecord insert failed (non-fatal):', e)
+   892→    return null
+   893→  })
+   894→
+   895→  // ─── 7. Escalation row if transfer failed / no answer ─────────────────
+   896→  if (transferStatus === 'failed' || transferStatus === 'no_answer') {
+   897→    await db.escalation.create({
+   898→      data: {
+   899→        complaintId: complaint.id,
+   900→        callId: callRecord?.id || null,
+   901→        level: 1,
+   902→        reason: `Transfer ${transferStatus} — officer ${officerName || departmentCode} unreachable`,
+   903→        notifiedTo: PRADHAN_WHATSAPP,
+   904→        status: 'pending',
+   905→      },
+   906→    }).catch((e) => {
+   907→      console.error('[vapi-webhook] Escalation insert failed (non-fatal):', e)
+   908→    })
+   909→
+   910→    // Notify Pradhan about the escalation
+   911→    const escalationMsg = [
+   912→      '⚠️ एस्केलेशन — कॉल ट्रांसफर फेल',
+   913→      `ट्रैकिंग आईडी: ${trackingId}`,
+   914→      `नागरिक: ${callerName} (${callerPhone || 'नंबर अनुपलब्ध'})`,
+   915→      `विभाग: ${department?.nameHi || departmentCode}`,
+   916→      `अधिकारी: ${officerName || 'नाम अनुपलब्ध'} (${officerPhone || 'नंबर अनुपलब्ध'})`,
+   917→      `कारण: अधिकारी उपलब्ध नहीं (${transferStatus})`,
+   918→      '',
+   919→      'कृपया शीघ्र ही नागरिक से संपर्क करें।',
+   920→    ].join('\n')
+   921→    await dispatchWhatsApp(PRADHAN_WHATSAPP, escalationMsg).catch(() => {})
+   922→  }
+   923→
+   924→  // ─── 8. WhatsApp dispatch: Pradhan + officer + head + citizen ────────
+   925→  const msgParams: ComplaintMsgParams = {
+   926→    name: callerName,
+   927→    phone: callerPhone,
+   928→    village: villageName,
+   929→    ward: wardNumber,
+   930→    categoryRich: categoryRich || categoryShort,
+   931→    categoryShort,
+   932→    priority,
+   933→    departmentName: department?.nameHi || department?.nameEn || departmentCode,
+   934→    trackingId,
+   935→    reason: callReason,
+   936→  }
+   937→  const complaintMsg = buildComplaintMessage(msgParams)
+   938→
+   939→  // Dedupe by phone number so the Pradhan (often also the dept head) gets ONE message.
+   940→  const seenPhonesEnd = new Set<string>()
+   941→  const recipients: Array<{ to: string; tag: string; msg: string }> = []
+   942→  function addRecipientEnd(to: string, tag: string, msg: string) {
+   943→    const digits = to.replace(/\D/g, '')
+   944→    if (!digits || digits.length < 7) return
+   945→    if (seenPhonesEnd.has(digits)) return
+   946→    seenPhonesEnd.add(digits)
+   947→    recipients.push({ to: digits, tag, msg })
+   948→  }
+   949→  addRecipientEnd(PRADHAN_WHATSAPP, 'pradhan', complaintMsg)
+   950→  if (department?.officerPhone) {
+   951→    addRecipientEnd(department.officerPhone, `officer:${departmentCode}`, complaintMsg)
+   952→  }
+   953→  if (department?.headPhone) {
+   954→    addRecipientEnd(department.headPhone, `head:${departmentCode}`, complaintMsg)
+   955→  }
+   956→  if (callerPhone) {
+   957→    addRecipientEnd(callerPhone, 'citizen', buildCitizenConfirmationMessage(msgParams))
+   958→  }
+   959→
+   960→  await Promise.allSettled(recipients.map((r) => dispatchWhatsApp(r.to, r.msg).catch(() => {})))
+   961→
+   962→  // ─── 9. Broadcast complaint:new event ────────────────────────────────
+   963→  broadcastEvent('complaint:new', {
+   964→    trackingId,
+   965→    complaintId: complaint.id,
+   966→    callRecordId: callRecord?.id || null,
+   967→    callerName,
+   968→    category: categoryShort,
+   969→    categoryRich: categoryRich || categoryShort,
+   970→    priority,
+   971→    departmentCode,
+   972→    village: villageName,
+   973→    ward: wardNumber,
+   974→    transferStatus,
+   975→    createdAt: nowIso,
+   976→  })
+   977→
+   978→  console.log(
+   979→    `[vapi-webhook] OK — complaint inserted: trackingId=${trackingId} vapiCallId=${vapiCallId} category=${categoryRich}→${categoryShort} dept=${departmentCode} priority=${priority}`,
+   980→  )
+   981→  return json({ ok: true, trackingId, complaintId: complaint.id, callRecordId: callRecord?.id || null })
+   982→}
+   983→
+   984→// ─── HTML doc page ────────────────────────────────────────────────────────
+   985→
+   986→const HTML_DOC = `<!DOCTYPE html>
+   987→<html lang="hi">
+   988→<head>
+   989→  <meta charset="utf-8">
+   990→  <meta name="viewport" content="width=device-width, initial-scale=1">
+   991→  <title>Vapi Webhook Service — Gram Panchayat Chandra</title>
+   992→  <style>
+   993→    :root { color-scheme: light dark; }
+   994→    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Devanagari", sans-serif; max-width: 880px; margin: 0 auto; padding: 32px 20px 80px; line-height: 1.6; background: #fafaf9; color: #1c1917; }
+   995→    @media (prefers-color-scheme: dark) { body { background: #0c0a09; color: #fafaf9; } }
+   996→    h1 { font-size: 1.6rem; margin: 0 0 4px; }
+   997→    h2 { font-size: 1.15rem; margin: 28px 0 8px; border-bottom: 1px solid #78716c33; padding-bottom: 4px; }
+   998→    .sub { color: #78716c; font-size: 0.9rem; margin-bottom: 8px; }
+   999→    code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; background: #e7e5e4; padding: 2px 6px; border-radius: 4px; font-size: 0.86rem; }
+  1000→    @media (prefers-color-scheme: dark) { code, pre { background: #1c1917; } }
+  1001→    pre { padding: 14px 16px; overflow-x: auto; border-radius: 8px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+  1002→    table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 0.9rem; }
+  1003→    th, td { border: 1px solid #78716c55; padding: 8px 10px; text-align: left; vertical-align: top; }
+  1004→    th { background: #e7e5e4; }
+  1005→    @media (prefers-color-scheme: dark) { th { background: #1c1917; } }
+  1006→    .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #16a34a; color: white; font-size: 0.74rem; font-weight: 600; margin-left: 6px; }
+  1007→    .back { display: inline-block; margin-top: 28px; text-decoration: none; color: #16a34a; font-weight: 600; }
+  1008→  </style>
+  1009→</head>
+  1010→<body>
+  1011→  <h1>Vapi Voice-Complaint Webhook <span class="badge">port 3003 · v2</span></h1>
+  1012→  <p class="sub">Gram Panchayat Chandra — Digital Governance Portal</p>
+  1013→
+  1014→  <h2>Endpoints</h2>
+  1015→  <table>
+  1016→    <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+  1017→    <tr><td><code>POST</code></td><td><code>/vapi-webhook</code></td><td>Receive a Vapi end-of-call-report, verify HMAC, insert Complaint + CallRecord + Escalation, dispatch WhatsApp to Pradhan + officer + head + citizen.</td></tr>
+  1018→    <tr><td><code>POST</code></td><td><code>/function-call</code></td><td>Dispatch a Vapi function-call payload to the right handler (registerComplaint, transferCall, getRoutingInfo, endCall).</td></tr>
+  1019→    <tr><td><code>POST</code></td><td><code>/send-whatsapp</code></td><td>Send a WhatsApp message to a specific number <code>{ to, message }</code>.</td></tr>
+  1020→    <tr><td><code>POST</code></td><td><code>/broadcast</code></td><td>Internal broadcast hook (writes to broadcast.log for SSE polling).</td></tr>
+  1021→    <tr><td><code>GET</code></td><td><code>/health</code></td><td>Liveness probe.</td></tr>
+  1022→    <tr><td><code>GET</code></td><td><code>/</code></td><td>This documentation page.</td></tr>
+  1023→  </table>
+  1024→
+  1025→  <h2>WhatsApp recipients on new complaint</h2>
+  1026→  <ul>
+  1027→    <li>Pradhan: <code>${PRADHAN_WHATSAPP}</code></li>
+  1028→    <li>Department officer (looked up from Department table)</li>
+  1029→    <li>Department head (if different from officer)</li>
+  1030→    <li>Citizen (confirmation message with tracking ID)</li>
+  1031→  </ul>
+  1032→
+  1033→  <a class="back" href="/?XTransformPort=3000">← वापस मुख्य पोर्टल पर जाएं / Back to main portal</a>
+  1034→</body>
+  1035→</html>`
+  1036→
+  1037→// ─── Bun server ───────────────────────────────────────────────────────────
+  1038→const server = Bun.serve({
+  1039→  port: PORT,
+  1040→  async fetch(req, server) {
+  1041→    const url = new URL(req.url)
+  1042→    const path = url.pathname
+  1043→
+  1044→    // GET /health
+  1045→    if (req.method === 'GET' && path === '/health') {
+  1046→      return json({
+  1047→        ok: true,
+  1048→        service: 'vapi-webhook',
+  1049→        port: PORT,
+  1050→        ts: new Date().toISOString(),
+  1051→      })
+  1052→    }
+  1053→
+  1054→    // GET / → HTML doc page
+  1055→    if (req.method === 'GET' && (path === '/' || path === '')) {
+  1056→      return new Response(HTML_DOC, {
+  1057→        headers: { 'content-type': 'text/html; charset=utf-8' },
+  1058→      })
+  1059→    }
+  1060→
+  1061→    // POST /vapi-webhook → main Vapi end-of-call webhook
+  1062→    if (req.method === 'POST' && (path === '/vapi-webhook' || path === '/webhook')) {
+  1063→      return handleWebhook(req, server)
+  1064→    }
+  1065→
+  1066→    // POST /function-call → dispatch a Vapi function-call payload
+  1067→    if (req.method === 'POST' && path === '/function-call') {
+  1068→      return handleFunctionCall(req)
+  1069→    }
+  1070→
+  1071→    // POST /send-whatsapp → send a WhatsApp message to a specific number
+  1072→    if (req.method === 'POST' && path === '/send-whatsapp') {
+  1073→      return handleSendWhatsApp(req)
+  1074→    }
+  1075→
+  1076→    // POST /broadcast → broadcast an event
+  1077→    if (req.method === 'POST' && path === '/broadcast') {
+  1078→      return handleBroadcast(req)
+  1079→    }
+  1080→
+  1081→    // 404
+  1082→    return json({ ok: false, error: 'Not Found', path }, 404)
+  1083→  },
+  1084→  error(err) {
+  1085→    console.error('[vapi-webhook] uncaught server error:', err)
+  1086→    return json({ ok: false, error: 'Internal Server Error' }, 500)
+  1087→  },
+  1088→})
+  1089→
+  1090→console.log(`[vapi-webhook] listening on http://localhost:${PORT}`)
+  1091→console.log(
+  1092→  `[vapi-webhook] dev_mode=${DEV_MODE} (HMAC ${DEV_MODE ? 'SKIPPED' : 'ENABLED'}) | ` +
+  1093→  `IP allowlist ${VAPI_IP_ALLOWLIST_RAW ? 'ENABLED' : 'OPEN (dev)'}`,
+  1094→)
+  1095→console.log(`[vapi-webhook] DATABASE_URL=${process.env.DATABASE_URL}`)
+  1096→console.log(`[vapi-webhook] Pradhan WhatsApp: ${PRADHAN_WHATSAPP}`)
+  1097→console.log(`[vapi-webhook] outbox log: ${OUTBOX_LOG}`)
+  1098→console.log(`[vapi-webhook] broadcast log: ${BROADCAST_LOG}`)
+  1099→
+  1100→process.on('SIGINT', () => {
+  1101→  console.log('[vapi-webhook] SIGINT — shutting down...')
+  1102→  db.$disconnect().finally(() => process.exit(0))
+  1103→})
+  1104→process.on('SIGTERM', () => {
+  1105→  console.log('[vapi-webhook] SIGTERM — shutting down...')
+  1106→  db.$disconnect().finally(() => process.exit(0))
+  1107→})
+  1108→
+  1109→export { server }
+  1110→

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ऑफ़लाइन — ग्राम पंचायत चंद्रा</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans Devanagari', 'Inter', system-ui, -apple-system, sans-serif;
+      background: oklch(0.985 0.012 85);
+      color: oklch(0.22 0.04 40);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .container {
+      max-width: 500px;
+      text-align: center;
+    }
+    .logo {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 1.5rem;
+      background: linear-gradient(135deg, oklch(0.62 0.18 55), oklch(0.52 0.16 55));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.8rem;
+      font-weight: bold;
+      box-shadow: 0 8px 24px oklch(0.62 0.18 55 / 0.3);
+    }
+    h1 {
+      font-size: 1.5rem;
+      color: oklch(0.62 0.18 55);
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      font-size: 1.1rem;
+      color: oklch(0.4 0.05 50);
+      margin-bottom: 1.5rem;
+    }
+    .message {
+      background: oklch(1 0 0);
+      border: 1px solid oklch(0.88 0.03 70);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 8px oklch(0 0 0 / 0.05);
+    }
+    .message p {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: oklch(0.35 0.03 50);
+      margin-bottom: 0.5rem;
+    }
+    .message p:last-child { margin-bottom: 0; }
+    .tricolor {
+      height: 3px;
+      background: linear-gradient(90deg, oklch(0.62 0.18 55) 0%, oklch(0.95 0.02 75) 50%, oklch(0.45 0.14 145) 100%);
+      border-radius: 2px;
+      margin-bottom: 2rem;
+    }
+    .btn {
+      display: inline-block;
+      background: oklch(0.62 0.18 55);
+      color: white;
+      padding: 0.75rem 2rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px oklch(0.62 0.18 55 / 0.3);
+    }
+    .btn:hover {
+      background: oklch(0.52 0.16 55);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px oklch(0.62 0.18 55 / 0.4);
+    }
+    .offline-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    .info-card {
+      background: oklch(0.95 0.02 75);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-size: 0.8rem;
+    }
+    .info-card strong {
+      display: block;
+      color: oklch(0.62 0.18 55);
+      font-size: 0.85rem;
+      margin-bottom: 0.25rem;
+    }
+    .info-card span {
+      color: oklch(0.4 0.05 50);
+    }
+    @media (max-width: 480px) {
+      .info-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="tricolor"></div>
+    <div class="logo">ग्रा</div>
+    <h1>ग्राम पंचायत चंद्रा</h1>
+    <p class="subtitle">डिजिटल शासन पोर्टल</p>
+
+    <div class="offline-icon">📡</div>
+
+    <div class="message">
+      <p><strong>आप अभी ऑफ़लाइन हैं।</strong></p>
+      <p>इंटरनेट कनेक्शन नहीं मिल रहा। कृपया अपना नेटवर्क जांचें और पुनः प्रयास करें।</p>
+      <p style="margin-top: 0.75rem; font-size: 0.85rem; color: oklch(0.5 0.04 60);">
+        You are currently offline. Please check your network connection and try again.
+      </p>
+    </div>
+
+    <button class="btn" onclick="window.location.reload()">
+      🔄 पुनः कनेक्ट करें / Reconnect
+    </button>
+
+    <div class="info-grid">
+      <div class="info-card">
+        <strong>📞 पंचायत कार्यालय</strong>
+        <span>+91 96510 35021</span>
+      </div>
+      <div class="info-card">
+        <strong>🏛️ पंचायत कोड</strong>
+        <span>3145021064</span>
+      </div>
+      <div class="info-card">
+        <strong>📍 पता</strong>
+        <span>शंकरगढ़, प्रयागराज, उ.प्र.</span>
+      </div>
+      <div class="info-card">
+        <strong>🚑 आपातकाल</strong>
+        <span>100 (पुलिस) · 108 (एम्बुलेंस)</span>
+      </div>
+    </div>
+
+    <p style="margin-top: 1.5rem; font-size: 0.75rem; color: oklch(0.5 0.04 60);">
+      © ग्राम पंचायत चंद्रा। सर्वाधिकार सुरक्षित।
+    </p>
+  </div>
+
+  <script>
+    // Auto-reload when connection is restored
+    window.addEventListener('online', () => {
+      window.location.reload();
+    });
+  </script>
+</body>
+</html>

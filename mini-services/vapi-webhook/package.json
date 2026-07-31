@@ -1,0 +1,14 @@
+{
+  "name": "chandra-vapi-webhook",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Vapi voice-complaint webhook mini-service for Gram Panchayat Chandra (Master Prompt v2.0 §5). Runs on port 3003.",
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "start": "bun index.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.11.1"
+  }
+}

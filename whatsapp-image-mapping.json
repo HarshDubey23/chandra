@@ -1,0 +1,120 @@
+{
+  "_meta": {
+    "description": "Manual image-to-section mapping based on WhatsApp chat context analysis. Chat extracted from /home/z/my-project/whatsapp-extract/WhatsApp Chat with +91 96510 35021.txt",
+    "chat_context": {
+      "pradhan_name": "श्रीमती संगीता मिश्रा / Smt. Sangita Mishra",
+      "pradhan_education": "BA BTC",
+      "secretary_name": "श्री बलवंत चौहान / Shri Balwant Chauhan",
+      "gpa_name": "बलवंत चौहान / Balwant Chauhan (Gram Panchayat Adhikari)",
+      "phone": "9651035021",
+      "village_facilities": [
+        "जन्म प्रमाण पत्र आवेदन",
+        "मृत्यु प्रमाण पत्र आवेदन",
+        "परिवार रजिस्टर की आनलाइन नकल",
+        "सरकारी जमीन का डाटा",
+        "आंगन बाड़ी केन्द्र",
+        "प्राथमिक विद्यालय",
+        "ग्राम पंचायत के वर्कर",
+        "आवास लाभार्थी (मुख्यमंत्री आवास, प्रधानमंत्री आवास)",
+        "दिव्यांग/विधवा/वृद्धा पेंशन लाभार्थी"
+      ],
+      "schemes_active": ["MGNREGA", "PMAY-G", "Mukhyamantri Awas", "Pension schemes"]
+    }
+  },
+  "image_mapping": {
+    "IMG-20260725-WA0003.jpg": {
+      "role": "pradhan_portrait",
+      "section": "representatives",
+      "priority": "high",
+      "person_name": "Smt. Sangita Mishra",
+      "person_role": "Pradhan",
+      "caption_hi": "श्रीमती संगीता मिश्रा, ग्राम प्रधान, ग्राम पंचायत चंद्रा",
+      "caption_en": "Smt. Sangita Mishra, Gram Pradhan, Gram Panchayat Chandra",
+      "chat_context": "Sent right after message 'संगीता मिश्रा / प्रधान'"
+    },
+    "IMG-20260725-WA0004.jpg": {
+      "role": "pradhan_education_document",
+      "section": "representatives",
+      "priority": "medium",
+      "caption_hi": "प्रधान जी की शैक्षिक योग्यता प्रमाण पत्र",
+      "caption_en": "Pradhan's educational qualification certificate",
+      "chat_context": "Sent in response to 'Education detail? Dalni' — Pradhan's BA BTC certificate"
+    },
+    "IMG-20260725-WA0005.jpg": {
+      "role": "pradhan_education_document",
+      "section": "representatives",
+      "priority": "medium",
+      "caption_hi": "प्रधान जी की शैक्षिक योग्यता प्रमाण पत्र",
+      "caption_en": "Pradhan's educational qualification certificate",
+      "chat_context": "Sent in response to 'Education detail? Dalni' — Pradhan's BA BTC certificate"
+    },
+    "IMG-20260725-WA0006.jpg": {
+      "role": "pradhan_education_document",
+      "section": "representatives",
+      "priority": "medium",
+      "caption_hi": "प्रधान जी की शैक्षिक योग्यता प्रमाण पत्र",
+      "caption_en": "Pradhan's educational qualification certificate",
+      "chat_context": "Sent in response to 'Education detail? Dalni' — Pradhan's BA BTC certificate"
+    },
+    "IMG-20260725-WA0007.jpg": {
+      "role": "pradhan_education_document",
+      "section": "representatives",
+      "priority": "medium",
+      "caption_hi": "प्रधान जी की शैक्षिक योग्यता प्रमाण पत्र",
+      "caption_en": "Pradhan's educational qualification certificate",
+      "chat_context": "Sent in response to 'Education detail? Dalni' — Pradhan's BA BTC certificate"
+    },
+    "IMG-20260725-WA0008.jpg": {
+      "role": "secretary_or_office_document",
+      "section": "representatives",
+      "priority": "medium",
+      "caption_hi": "ग्राम पंचायत कार्यालय का दस्तावेज़",
+      "caption_en": "Gram Panchayat office document",
+      "chat_context": "Sent after question about Gram Sachiv details"
+    },
+    "IMG-20260725-WA0009.jpg": {
+      "role": "secretary_or_office_document",
+      "section": "representatives",
+      "priority": "medium",
+      "caption_hi": "ग्राम पंचायत कार्यालय का दस्तावेज़",
+      "caption_en": "Gram Panchayat office document",
+      "chat_context": "Sent after question about Gram Sachiv details"
+    },
+    "IMG-20260725-WA0091.jpg": {
+      "role": "gpa_portrait",
+      "section": "representatives",
+      "priority": "high",
+      "person_name": "Balwant Chauhan",
+      "person_role": "Gram Panchayat Adhikari",
+      "caption_hi": "श्री बलवंत चौहान, ग्राम पंचायत अधिकारी",
+      "caption_en": "Shri Balwant Chauhan, Gram Panchayat Adhikari",
+      "chat_context": "Sent with message 'बलवंत चौहान / ग्राम पंचायत अधिकारी'"
+    },
+    "IMG-20260725-WA0092.jpg": {
+      "role": "gpa_document_or_portrait",
+      "section": "representatives",
+      "priority": "medium",
+      "caption_hi": "ग्राम पंचायत अधिकारी संबंधित दस्तावेज़",
+      "caption_en": "Gram Panchayat Adhikari related document",
+      "chat_context": "Sent immediately after 'बलवंत चौहान / ग्राम पंचायत अधिकारी'"
+    },
+    "IMG-20260725-WA0083.jpg": {
+      "role": "pradhan_personal",
+      "section": "representatives",
+      "priority": "medium",
+      "caption_hi": "प्रधान जी का व्यक्तिगत दृश्य",
+      "caption_en": "Pradhan's personal belonging/photo",
+      "chat_context": "Sent with message 'ये मेरा है!' (This is mine!)"
+    }
+  },
+  "bulk_images_0011_to_0082": {
+    "_note": "These 70+ images were sent in bulk without specific captions. They are village infrastructure/scheme beneficiary/event photos. Will use VLM to analyze each one and distribute across sections.",
+    "default_section": "gallery",
+    "needs_vlm_analysis": true
+  },
+  "bulk_images_0084_to_0090": {
+    "_note": "Late batch images, likely village scenes",
+    "default_section": "gallery",
+    "needs_vlm_analysis": true
+  }
+}

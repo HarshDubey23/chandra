@@ -1,0 +1,41 @@
+{
+  "name": "ग्राम पंचायत चंद्रा — डिजिटल शासन पोर्टल",
+  "short_name": "GP Chandra",
+  "description": "OSINT-Verified bilingual digital governance portal for Gram Panchayat Chandra, Shankargarh, Prayagraj, UP",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fbf7f0",
+  "theme_color": "#c2410c",
+  "lang": "hi",
+  "dir": "ltr",
+  "categories": ["government", "civic", "productivity"],
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Track Complaint",
+      "short_name": "Track",
+      "description": "Track your complaint status",
+      "url": "/?view=complaints"
+    },
+    {
+      "name": "View Schemes",
+      "short_name": "Schemes",
+      "description": "View government schemes and beneficiaries",
+      "url": "/?view=home#schemes"
+    },
+    {
+      "name": "View Budget",
+      "short_name": "Budget",
+      "description": "View panchayat budget allocation",
+      "url": "/?view=home#budget"
+    }
+  ]
+}

@@ -1,0 +1,402 @@
+// Prisma schema for Gram Panchayat Chandra Digital Governance Portal
+// Master Prompt v2.0 — §6.2 editable entities, §3.6 audit, §4.3 image map
+// SQLite provider (sandbox constraint) — JSON stored as String
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Auth & Users (§6.1 RBAC)
+// ────────────────────────────────────────────────────────────────────────────
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("viewer") // admin | secretary | viewer
+  phone        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  activityLogs AdminActivityLog[]
+  complaintsAssigned Complaint[] @relation("AssignedComplaints")
+  posts Post[] @relation("PostAuthor")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Site Settings (§6.2) — key/value JSONB store for Pradhan/Secretary/SiteConfig
+// ────────────────────────────────────────────────────────────────────────────
+model SiteSettings {
+  key       String   @id // pradhan | secretary | site_config | gpdp_year
+  value     String   // JSON string
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Announcements & Notices (§6.2)
+// ────────────────────────────────────────────────────────────────────────────
+model Announcement {
+  id        String    @id @default(cuid())
+  titleHi   String
+  titleEn   String
+  bodyHi    String
+  bodyEn    String
+  imageUrl  String?
+  pdfUrl    String?
+  pinned    Boolean   @default(false)
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String?
+}
+
+model Notice {
+  id        String   @id @default(cuid())
+  titleHi   String
+  titleEn   String
+  bodyHi    String
+  bodyEn    String
+  pdfUrl    String?
+  category  String   @default("general") // general | scheme | meeting | tender
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Image Assets (§4.3 image_map.jsonl) — gallery + evidence
+// ────────────────────────────────────────────────────────────────────────────
+model ImageAsset {
+  id            String   @id @default(cuid())
+  imageId       String   @unique // img_001 etc.
+  filename      String
+  url           String
+  sha256        String?
+  category      String   // infrastructure.water.handpump etc. (§4.4 taxonomy)
+  subcategory   String?
+  hiCaption     String
+  enCaption     String
+  schemeLogos   String?  // JSON array of scheme codes
+  purpose       String   @default("asset-evidence")
+  chatContext   String?  // JSON {sender, ts, msg_before, msg_after}
+  exif          String?  // JSON
+  geoInferred   String?  // JSON
+  scrollSection String?  // water-infrastructure | school | etc.
+  facesDetected Int      @default(0)
+  piiFlag       Boolean  @default(false)
+  confidence    Float    @default(0.8)
+  isPublic      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Complaints (§5 — Vapi voice complaint system)
+// ────────────────────────────────────────────────────────────────────────────
+model Complaint {
+  id             String   @id @default(cuid())
+  trackingId     String   @unique
+  vapiCallId     String?
+  callerName     String
+  callerPhone    String   // hashed per DPDP, last-4 visible in admin only
+  callReason     String
+  category       String   @default("other") // water | road | school | housing | pension | mgnrega | other
+  status         String   @default("Pending") // Pending | InProgress | Resolved | Rejected
+  rawTranscript  String?
+  assignedToId   String?
+  assignedTo     User?    @relation("AssignedComplaints", fields: [assignedToId], references: [id])
+  resolutionNote String?
+  resolvedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // status timeline (JSON array of {status, ts, note, by})
+  timeline       String?
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Scraped Data — generic provenance-bearing table (§3.6 audit schema)
+// One row per scraped record across all portals (NREGA, eGramSwaraj, PMAY-G, etc.)
+// ────────────────────────────────────────────────────────────────────────────
+model ScrapedData {
+  id              String   @id @default(cuid())
+  portal          String   // nrega | egramswaraj | pmayg | lgdirectory | pb2 | census | jjm | udise | icds
+  sourceUrl       String
+  recordType      String   // jobcard | muster | fto | actionplan | asset | beneficiary | profile | village
+  data            String   // JSON payload (PII-redacted)
+  contentHash     String
+  retrievedAt     DateTime @default(now())
+  httpStatus      Int      @default(200)
+  bytes           Int      @default(0)
+  piiRedactions   Int      @default(0)
+  piiRedactionTypes String? // JSON array
+  isOverridden    Boolean  @default(false)
+  overrideValue   String?  // JSON
+  overrideReason  String?
+  overriddenBy    String?
+  overriddenAt    DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([portal, recordType])
+  @@index([sourceUrl])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Scrape Audit Log (§3.6) — one row per scrape attempt
+// ────────────────────────────────────────────────────────────────────────────
+model ScrapeAudit {
+  id              String   @id @default(cuid())
+  attemptId       String   @unique
+  tsUtc           DateTime @default(now())
+  portal          String
+  sourceUrl       String
+  httpStatus      Int
+  bytes           Int      @default(0)
+  contentHashSha256 String?
+  recordsExtracted Int     @default(0)
+  piiRedactions   Int      @default(0)
+  piiRedactionTypes String? // JSON
+  errors          String?  // JSON array
+  durationMs      Int      @default(0)
+  userAgent       String?
+  robotsAllowed   Boolean  @default(true)
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Admin Activity Log (§6.3) — IMMUTABLE, insert only
+// ────────────────────────────────────────────────────────────────────────────
+model AdminActivityLog {
+  id         String   @id @default(cuid())
+  adminId    String?
+  admin      User?    @relation(fields: [adminId], references: [id])
+  action     String   // update | delete | override | upload | login | logout
+  entityType String   // pradhan | secretary | announcement | complaint | scraped_data | image | site_config
+  entityId   String?
+  before     String?  // JSON
+  after      String?  // JSON
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Citizen Feedback (Task 7-c) — submitted via public portal complaint widget
+// Linked to Complaint.trackingId; aggregated in admin FeedbackDashboard.
+// ────────────────────────────────────────────────────────────────────────────
+model CitizenFeedback {
+  id          String   @id @default(cuid())
+  trackingId  String   // links to Complaint.trackingId
+  rating      Int      // 1-5 stars
+  comment     String?  // optional text
+  language    String   @default("hi") // submission locale
+  createdAt   DateTime @default(now())
+
+  @@index([trackingId])
+  @@index([rating])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Citizen Polls/Surveys (Task 8-a) — admin creates bilingual polls with 2-6
+// options; citizens vote anonymously (one per poll per voterKey); results
+// visible to all. voterKey = sha256(ip + user-agent + pollId).
+// ────────────────────────────────────────────────────────────────────────────
+model Poll {
+  id            String   @id @default(cuid())
+  questionHi    String
+  questionEn    String
+  descriptionHi String?
+  descriptionEn String?
+  status        String   @default("active") // "active" | "closed"
+  startDate     DateTime @default(now())
+  endDate       DateTime?
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  options       PollOption[]
+  votes         PollVote[]
+
+  @@index([status])
+}
+
+model PollOption {
+  id        String   @id @default(cuid())
+  pollId    String
+  textHi    String
+  textEn    String
+  order     Int      @default(0)
+  poll      Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes     PollVote[]
+
+  @@index([pollId])
+}
+
+model PollVote {
+  id        String   @id @default(cuid())
+  pollId    String
+  optionId  String
+  voterKey  String   // anonymized voter identifier (sha256 of IP+UA+pollId)
+  createdAt DateTime @default(now())
+  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  option    PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, voterKey]) // one vote per poll per voter
+  @@index([pollId])
+  @@index([optionId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Village Marketplace (Task 10-a) — citizens list local produce/items for
+// sale or exchange. Admin must approve before items become publicly visible.
+// ────────────────────────────────────────────────────────────────────────────
+model MarketplaceItem {
+  id           String   @id @default(cuid())
+  itemId       String   @unique @default(cuid())   // e.g. "MPCH-XXXXX"
+  titleHi      String                          // Hindi title
+  titleEn      String                          // English title
+  descHi       String?                         // Hindi description
+  descEn       String?                         // English description
+  category     String                          // "produce", "livestock", "handcraft", "equipment", "services", "other"
+  price        Int?                            // Price in ₹ (null = free/barter)
+  priceType    String   @default("fixed")      // "fixed", "negotiable", "barter", "free"
+  quantity     String?                         // e.g. "5 kg", "2 units"
+  sellerNameHi String                          // Hindi seller name
+  sellerNameEn String                          // English seller name
+  sellerPhone  String                          // Contact phone
+  sellerWard   Int?                            // Ward number (1-10)
+  imageUrl     String?                         // Optional image URL
+  isApproved   Boolean  @default(false)        // Admin must approve before visible
+  status       String   @default("active")     // "active", "sold", "expired"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([category])
+  @@index([status])
+  @@index([isApproved])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Blog / CMS Posts (master doc §4.2) — admin-published articles
+// ────────────────────────────────────────────────────────────────────────────
+model Post {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  excerpt     String
+  content     String   // HTML content from rich text editor
+  coverImage  String?
+  category    String   @default("news") // announcement | scheme | news | meeting | notice
+  status      String   @default("draft") // draft | published | archived
+  tags        String   @default("[]")   // JSON array of tag strings
+  authorId    String?
+  author      User?    @relation("PostAuthor", fields: [authorId], references: [id])
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([category])
+  @@index([publishedAt])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Dynamic Content Sections (master doc §4.3) — admin-editable portal data
+// Stores JSON for each section so admin can update without code changes.
+// ────────────────────────────────────────────────────────────────────────────
+model ContentSection {
+  key       String   @id // e.g. "village_stats", "infrastructure", "education"
+  data      String   // JSON string with all section-specific data
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Citizen Notification Subscriptions (master doc §9.2)
+// Citizens subscribe to complaint status updates by tracking ID + phone.
+// ────────────────────────────────────────────────────────────────────────────
+model NotificationSubscription {
+  id          String   @id @default(cuid())
+  trackingId  String   // links to Complaint.trackingId
+  phone       String   // citizen phone for WhatsApp/SMS
+  channel     String   @default("sms") // "sms" | "whatsapp" | "both"
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([trackingId])
+  @@index([phone])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Vapi AI Voice System — Departments, Routing, Call Records, Escalations
+// ────────────────────────────────────────────────────────────────────────────
+model Department {
+  id           String   @id @default(cuid())
+  code         String   @unique    // e.g. "water", "roads", "health", "emergency"
+  nameHi       String              // Hindi name
+  nameEn       String              // English name
+  officerName  String?             // Responsible officer name
+  officerPhone String?             // Phone number for call transfer
+  headPhone    String?             // Department head phone
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model RoutingRule {
+  id              String   @id @default(cuid())
+  category        String   @unique    // complaint category: "water_supply", "road_damage", etc.
+  subcategory     String?
+  departmentCode  String              // links to Department.code
+  priority        String   @default("medium")  // low, medium, high, critical, emergency
+  slaHours        Int      @default(72)        // SLA in hours
+  escalationLevel Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model CallRecord {
+  id              String   @id @default(cuid())
+  vapiCallId      String?  @unique
+  callerPhone     String?
+  citizenName     String?
+  villageName     String?
+  wardNumber      Int?
+  category        String?             // complaint category
+  subcategory     String?
+  priority        String   @default("medium")
+  departmentCode  String?
+  transferTarget  String?             // phone number transferred to
+  transferStatus  String   @default("pending")  // pending, connected, failed, no_answer
+  complaintId     String?
+  transcript      String?             // call transcript
+  recordingUrl    String?
+  duration        Int      @default(0)  // seconds
+  aiConfidence    Float?               // 0-1 confidence score
+  suggestedAction String?
+  language        String   @default("hi")  // hi, en, hinglish
+  notes           String?
+  status          String   @default("active")  // active, ended, transferred
+  startedAt       DateTime @default(now())
+  endedAt         DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Escalation {
+  id          String   @id @default(cuid())
+  complaintId String?
+  callId      String?
+  level       Int      @default(1)  // 1-5
+  reason      String
+  notifiedTo  String?  // phone numbers notified
+  status      String   @default("pending")  // pending, acknowledged, resolved
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
