@@ -13,15 +13,17 @@ import type { NextConfig } from "next";
  */
 const securityHeaders = [
   // CSP — restrict resource loading to self + approved sources
+  // Updated to support Vapi Web SDK (Daily.co WebRTC + AudioWorklet + blob scripts)
   {
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+      "worker-src 'self' blob:",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' data:",
       "img-src 'self' data: blob: https:",
-      "media-src 'self' https://*.daily.co blob:",
+      "media-src 'self' blob: https: https://*.daily.co",
       "connect-src 'self' https://api.vapi.ai https://general.vapi.ai wss://general.vapi.ai https://*.daily.co wss://*.daily.co https://daily.co wss://daily.co",
       "frame-ancestors 'none'",
       "base-uri 'self'",
