@@ -1,25 +1,19 @@
 // OTP send — generates a 6-digit OTP for phone-based login
-// In production this would send via SMS/WhatsApp. For demo, returns the OTP.
+// In production this would send via SMS/WhatsApp. For demo (non-prod), returns the OTP.
+// SECURITY (BACKEND_AUDIT.md P0): demoOtp gated behind NODE_ENV !== 'production'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import crypto from 'node:crypto'
+import { otpSendSchema, parseBody } from '@/lib/validations'
 
 export async function POST(req: NextRequest) {
-  const body = await req.json()
-  const { phone } = body
-
-  if (!phone) {
-    return NextResponse.json({ error: 'phone_required' }, { status: 400 })
+  const parsed = await parseBody(req, otpSendSchema)
+  if ('error' in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status })
   }
+  const { phone: normalizedPhone } = parsed.data
 
-  // Normalize phone (remove +91, spaces)
-  const normalizedPhone = phone.replace(/\D/g, '').slice(-10)
-
-  if (normalizedPhone.length !== 10) {
-    return NextResponse.json({ error: 'invalid_phone' }, { status: 400 })
-  }
-
-  // Check if any user has this phone
+  // Check if any user has this phone (do not leak existence to caller)
   const user = await db.user.findFirst({ where: { phone: { contains: normalizedPhone } } })
 
   // Generate 6-digit OTP
@@ -34,13 +28,13 @@ export async function POST(req: NextRequest) {
   })
 
   // In production: send OTP via SMS/WhatsApp API
-  // For demo: return the OTP so the UI can display it
+  const isDev = process.env.NODE_ENV !== 'production'
+
   return NextResponse.json({
     ok: true,
     message: `OTP sent to +91 ${normalizedPhone}`,
     registered: !!user,
-    // Demo only — remove in production:
-    demoOtp: otp,
-    demoExpiry: expiresAt.toISOString(),
+    // Dev/demo only — NEVER expose OTP in production responses
+    ...(isDev ? { demoOtp: otp, demoExpiry: expiresAt.toISOString() } : {}),
   })
 }

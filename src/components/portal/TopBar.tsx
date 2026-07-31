@@ -56,17 +56,21 @@ export function TopBar() {
   // Always render the SAME structure on server and client (hydration-safe).
   // Empty strings render as empty spans; after mount they fill with live data.
   return (
-    <div className="hidden border-b border-border/30 lg:block relative overflow-hidden" style={{ background: 'linear-gradient(135deg, oklch(0.97 0.01 85) 0%, oklch(0.96 0.015 75) 50%, oklch(0.96 0.012 90) 100%)' }}>
+    <div className="hidden border-b border-border/30 lg:block relative overflow-hidden bg-muted/40">
       {/* Tricolor accent line at the very top */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary/40 via-white/60 to-green-600/40" />
 
       {/* Subtle pattern overlay */}
-      <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: 'radial-gradient(circle, oklch(0.5 0.1 50) 0.5px, transparent 0.5px)', backgroundSize: '12px 12px' }} />
+      <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, oklch(0.5 0.1 50) 0.5px, transparent 0.5px)', backgroundSize: '12px 12px' }} />
 
       <div className="container mx-auto flex h-9 items-center justify-between px-4 text-[11px] relative">
-        {/* Left — live date & time */}
+        {/* Left — live date & time with pulse indicator */}
         <div className="flex items-center gap-2.5">
           <span className="flex items-center gap-1.5 text-muted-foreground font-medium">
+            <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            </span>
             <Clock className="h-3 w-3 text-primary/70" />
             <span suppressHydrationWarning>{dateStr}</span>
           </span>

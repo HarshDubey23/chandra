@@ -2,13 +2,13 @@
 // Master doc §9.1 — citizen complaint flow (web variant).
 // Generates a GPCH- tracking ID, stores complaint with source='web' timeline,
 // hashes caller phone per DPDP (last-4 visible in admin only).
+// SECURITY (BACKEND_AUDIT.md): Zod validation + rate limiting + phone hashing.
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import crypto from 'node:crypto'
+import { complaintCreateSchema, parseBody } from '@/lib/validations'
 
 export const dynamic = 'force-dynamic'
-
-const ALLOWED_CATEGORIES = ['water', 'road', 'school', 'housing', 'pension', 'mgnrega', 'other']
 
 // Simple in-memory rate limit: max 5 complaints per IP per 10 minutes
 const RATE_WINDOW_MS = 10 * 60 * 1000
@@ -33,31 +33,25 @@ function hashPhone(phone: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  let body: { callerName?: string; callerPhone?: string; callReason?: string; category?: string }
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'invalid_json' }, { status: 400 })
+  const parsed = await parseBody(req, complaintCreateSchema)
+  if ('error' in parsed) {
+    // Map Zod error codes to bilingual user messages
+    const msgMap: Record<string, string> = {
+      name_too_short: 'कृपया नाम दर्ज करें',
+      phone_required: 'कृपया सही 10-अंकीय फ़ोन नंबर दर्ज करें',
+      invalid_phone: 'कृपया सही 10-अंकीय फ़ोन नंबर दर्ज करें',
+      reason_too_short: 'कृपया शिकायत विवरण दर्ज करें (कम से कम 10 अक्षर)',
+    }
+    return NextResponse.json(
+      { error: parsed.error, message: msgMap[parsed.error] || 'अमान्य इनपुट' },
+      { status: parsed.status }
+    )
   }
+  const { callerName, callerPhone, callReason, category, vapiCallId } = parsed.data
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown'
   if (rateLimited(ip)) {
     return NextResponse.json({ error: 'rate_limited', message: 'बहुत अधिक शिकायतें। 10 मिनट बाद प्रयास करें।' }, { status: 429 })
-  }
-
-  const callerName = (body.callerName || '').trim().slice(0, 100)
-  const callerPhone = (body.callerPhone || '').trim().replace(/[^\d+]/g, '').slice(0, 15)
-  const callReason = (body.callReason || '').trim().slice(0, 2000)
-  const category = ALLOWED_CATEGORIES.includes(body.category || '') ? body.category! : 'other'
-
-  if (!callerName) {
-    return NextResponse.json({ error: 'missing_name', message: 'कृपया नाम दर्ज करें' }, { status: 400 })
-  }
-  if (!callerPhone || callerPhone.replace(/[^\d]/g, '').length < 10) {
-    return NextResponse.json({ error: 'missing_phone', message: 'कृपया सही 10-अंकीय फ़ोन नंबर दर्ज करें' }, { status: 400 })
-  }
-  if (!callReason || callReason.length < 10) {
-    return NextResponse.json({ error: 'missing_reason', message: 'कृपया शिकायत विवरण दर्ज करें (कम से कम 10 अक्षर)' }, { status: 400 })
   }
 
   const trackingId = generateTrackingId()
@@ -80,6 +74,7 @@ export async function POST(req: NextRequest) {
         callReason,
         category,
         status: 'Pending',
+        vapiCallId: vapiCallId || null,
         rawTranscript: `Web complaint from ${callerName} (${ip})`,
         timeline: JSON.stringify(timeline),
       },

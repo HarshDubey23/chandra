@@ -212,3 +212,45 @@ Unresolved risks / next-phase recommendations:
 - The admin panel position warnings ("container has non-static position") come from a scroll library — non-blocking but could be investigated.
 - Backend Zod validation (flagged in BACKEND_AUDIT.md) is still not implemented on most API routes — a future security-focused round could add Zod schemas.
 - The OTP-in-response and demo-token-in-response security issues (P0 findings in BACKEND_AUDIT.md) should be gated behind NODE_ENV !== 'production' in a future hardening round.
+
+---
+Task ID: 7 (webDevReview cron round 2)
+Agent: main (QA + security hardening + enhancement round)
+Task: Assess status, QA via agent-browser, fix touch-target bug, harden security, add Zod validation, enhance styling
+
+Work Log:
+- Read worklog.md (round 1 complete: SectionHeading, KineticDivider, LivePortalStats, DarkModeToggle fix, Footer improvements all live).
+- QA via agent-browser (desktop 1440px + mobile 360px):
+  * Landing + guest entry: clean, Hero h1 renders, zero errors.
+  * TopBar pulse + grain + mesh all present.
+  * Mobile 360px: zero horizontal scroll (confirmed).
+  * BUG FOUND: 15 header buttons were undersized (36px height) on mobile — violating the 44px touch-target rule (WCAG 2.5.5 / DESIGN_INTELLIGENCE §6). The existing `@media (hover:none) and (pointer:coarse)` CSS rule wasn't applying because (a) no `!important` and (b) agent-browser viewport doesn't trigger `pointer:coarse`.
+  * "container position" warnings: traced to Radix ScrollArea (known cosmetic issue, non-blocking).
+- BUG FIXED — Mobile touch targets: Rewrote the touch-target CSS in globals.css. Now targets `header button` + `footer button` specifically with `!important` on `(hover:none) and (pointer:coarse)`, plus a `@media (max-width:768px)` fallback that enforces `min-height:44px` regardless of pointer type (covers hybrid devices). Verified: ZERO undersized header buttons on mobile 360px after fix.
+- SECURITY HARDENED (BACKEND_AUDIT.md P0 findings):
+  * Created `src/lib/validations.ts` — comprehensive Zod schema library: phoneSchema (10-digit IN mobile), otpSchema, emailSchema, trackingIdSchema, complaintCategorySchema, complaintCreateSchema, pollVoteSchema, signupSchema, otpSendSchema, otpVerifySchema, forgotPasswordSchema, marketplaceCreateSchema. Plus a `parseBody<T>()` helper that safely parses JSON + Zod in one call.
+  * Fixed `api/auth/otp-send/route.ts`: Zod validation (otpSendSchema) + `demoOtp`/`demoExpiry` now gated behind `process.env.NODE_ENV !== 'production'` (spread conditionally). In production, the OTP is NEVER returned in the response.
+  * Fixed `api/auth/forgot-password/route.ts`: Zod validation (forgotPasswordSchema) + `demoToken`/`demoExpiry` gated behind `NODE_ENV !== 'production'`.
+  * Fixed `api/complaints/create/route.ts`: Replaced manual validation with Zod (complaintCreateSchema). Added bilingual error message map. Preserved rate limiting + phone hashing + tracking ID generation.
+  * Verified via curl: invalid phone → `{"error":"invalid_phone"}`, short reason → `{"error":"reason_too_short","message":"कृपया शिकायत विवरण दर्ज करें (कम से कम 10 अक्षर)"}`, dev-mode OTP send still returns demoOtp (correct for dev).
+- ENHANCEMENT 1 — Migrated VillageStats section header to SectionHeading component: replaced inline Badge+h2+p with `<SectionHeading hi="विवरण एवं सांख्यिकी" en="Village Statistics" eyebrowHi="सांख्यिकी" eyebrowEn="Statistics" icon={BarChart3} align="center" showDivider />`. Now has kinetic mask-up reveal + tricolor 3-dot divider + bilingual hierarchy. Verified rendering.
+- ENHANCEMENT 2 — Upgraded ScrollProgress: replaced raw scroll listener with requestAnimationFrame-throttled handler (no scroll churn), replaced `transition: width` (causes layout) with `transform: scaleX()` (GPU-only), added saffron glow boxShadow when progress > 5%. Uses `origin-left` for correct scale direction.
+- ENHANCEMENT 3 — Upgraded TopBar: added live emerald pulse indicator (animate-ping dot) next to the clock for a "living portal" feel, replaced inline gradient style with `bg-muted/40` (respects OKLCH tokens in both themes), added `pointer-events-none` to pattern overlay.
+- `bun run lint` — ZERO errors, ZERO warnings.
+
+Stage Summary:
+- Dev server: port 3000, `/` returns 200. vapi-webhook: port 3003 healthy.
+- All 60+ portal components, 17 admin components, 4 auth components, 47 API routes, 20 Prisma models PRESERVED — zero feature deletion.
+- SECURITY: 3 API routes hardened (otp-send, forgot-password, complaints/create) with Zod validation + demo-credential production gating. P0 findings from BACKEND_AUDIT.md addressed.
+- BUG FIX: Mobile touch targets — all header/footer buttons now ≥44px on touch devices + small viewports.
+- NEW: `src/lib/validations.ts` (Zod schema library, 12 schemas + parseBody helper).
+- UPGRADED: VillageStats (SectionHeading), ScrollProgress (rAF + GPU transform + glow), TopBar (pulse indicator + token-based bg), globals.css (touch-target enforcement).
+- Agent Browser: Hero ✓, TopBar pulse ✓, SectionHeading ✓, zero errors ✓, zero undersized mobile buttons ✓.
+- `bun run lint` passes clean.
+
+Unresolved risks / next-phase recommendations:
+- Continue migrating remaining ~38 section headers to SectionHeading (one per round to avoid regressions). Priority: Schemes, GramSabha, BudgetSection, GrievanceSection.
+- Add Zod validation to remaining high-risk routes: polls/[id]/vote, marketplace/route, admin/csv-upload, admin/users.
+- The Radix ScrollArea "container position" warning is cosmetic — could be fixed by wrapping ScrollArea usages in a `position: relative` container, but low priority.
+- Consider adding a CSP (Content-Security-Policy) header in next.config.ts for defense-in-depth.
+- The vapi-webhook `/function-call` endpoint has no auth (BACKEND_AUDIT.md P0) — should add HMAC or origin-check in a future round.

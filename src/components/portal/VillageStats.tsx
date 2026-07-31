@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { PieChart, Pie, Cell, BarChart, Bar, ResponsiveContainer, Tooltip, Legend, Label } from 'recharts'
 import { Droplets, School, Route, Home, Sun, Building2, BarChart3, TrendingUp, Activity, Layers } from 'lucide-react'
 import { ScrollReveal } from './ScrollReveal'
+import { SectionHeading } from './SectionHeading'
 
 interface StatsData {
   complaints: { total: number; pending: number; inProgress: number; resolved: number; rejected: number }
@@ -119,17 +120,19 @@ export function VillageStats() {
       <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-green-500/5 rounded-full blur-3xl" />
 
       <div className="container mx-auto px-4 relative z-10">
-        {/* ── Section Header ── */}
+        {/* ── Section Header — kinetic mask-up reveal ── */}
         <ScrollReveal delay={0.1}>
-          <div className="mb-12 text-center">
-            <Badge variant="outline" className="mb-4 gap-2 px-4 py-1.5 text-sm border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors">
-              <BarChart3 className="h-4 w-4 text-primary" />
-              {isHi ? 'सांख्यिकी' : 'Statistics'}
-            </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold section-heading">
-              {isHi ? 'विवरण एवं सांख्यिकी' : 'Village Statistics'}
-            </h2>
-            <p className="text-base text-muted-foreground mt-4 max-w-2xl mx-auto leading-relaxed">
+          <div className="mb-12">
+            <SectionHeading
+              hi={isHi ? 'विवरण एवं सांख्यिकी' : 'ग्राम सांख्यिकी'}
+              en="Village Statistics"
+              eyebrowHi="सांख्यिकी"
+              eyebrowEn="Statistics"
+              icon={<BarChart3 className="h-3.5 w-3.5" />}
+              align="center"
+              showDivider
+            />
+            <p className="text-base text-muted-foreground mt-4 max-w-2xl mx-auto leading-relaxed text-center">
               {isHi
                 ? 'ग्राम चंद्रा की शिकायत स्थिति, योजना कवरेज और आधारभूत संरचना सारांश'
                 : 'Complaint status, scheme coverage, and infrastructure summary for Chandra village'}
