@@ -66,6 +66,36 @@ async function getVapi() {
     const Vapi = (await import('@vapi-ai/web')).default
     vapi = new (Vapi as any)(key)
 
+    // ── CRITICAL FIX: Monkey-patch updateInputSettings to skip Krisp ──
+    // The Vapi SDK v2.6.1 hardcodes Krisp noise cancellation (type: 'noise-cancellation').
+    // When the AudioWorklet fails to load (CSP/blob issues), the audio pipeline crashes
+    // and the call drops after ~30 seconds. This patch intercepts updateInputSettings
+    // and replaces 'noise-cancellation' with 'none' — bypassing Krisp entirely.
+    const originalStart = (vapi as any).start.bind(vapi)
+    ;(vapi as any).start = async function (...args: unknown[]) {
+      const result = await originalStart(...args)
+      // After call starts, patch the Daily call object
+      const call = (vapi as any).call
+      if (call && call.updateInputSettings) {
+        const originalUpdate = call.updateInputSettings.bind(call)
+        call.updateInputSettings = function (settings: Record<string, unknown>) {
+          // Replace noise-cancellation with none
+          try {
+            const audio = (settings as any)?.audio
+            if (audio?.processor?.type === 'noise-cancellation') {
+              audio.processor.type = 'none'
+            }
+          } catch { /* ignore */ }
+          return originalUpdate(settings)
+        }
+        // Immediately set processor to none (pre-empt the SDK's Krisp attempt)
+        try {
+          await originalUpdate({ audio: { processor: { type: 'none' } } })
+        } catch { /* ignore */ }
+      }
+      return result
+    }
+
     vapi.on('call-start', () => { activeCall = true; notifyState?.(true) })
     vapi.on('call-start-success', () => { activeCall = true; notifyState?.(true) })
     vapi.on('call-end', () => { activeCall = false; notifyState?.(false) })
