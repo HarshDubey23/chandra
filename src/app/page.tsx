@@ -40,6 +40,14 @@ export default function Home() {
   // Show landing page if not authenticated and not in guest mode
   const showPortal = isAuthenticated || isGuest
 
+  // Scroll to top instantly when transitioning from landing → portal (login/guest)
+  // Prevents the portal from opening mid-scroll wherever the user was on the landing page
+  useEffect(() => {
+    if (showPortal) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior })
+    }
+  }, [showPortal])
+
   if (!showPortal) {
     return <LandingPage />
   }
