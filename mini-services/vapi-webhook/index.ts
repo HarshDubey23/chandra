@@ -115,9 +115,36 @@ function verifyHmac(rawBody: string, signature: string, secret: string): boolean
   return timingSafeEqual(a, b)
 }
 
-/** Generate the tracking id: GPCH-<base36 of Date.now(), uppercased>. */
-function generateTrackingId(): string {
-  return `GPCH-${Date.now().toString(36).toUpperCase()}`
+/**
+ * Generate sequential tracking ID: GPCH-2026-000001
+ * Uses SiteSettings counter (atomic via upsert).
+ */
+async function generateTrackingId(): Promise<string> {
+  const year = new Date().getFullYear()
+  const counterKey = `complaint_counter_${year}`
+
+  // Read current count
+  const existing = await db.siteSettings.findUnique({ where: { key: counterKey } }).catch(() => null)
+  let currentCount = 0
+  if (existing) {
+    try {
+      const data = JSON.parse(existing.value) as { count: number }
+      currentCount = data.count || 0
+    } catch { /* ignore parse errors */ }
+  }
+  const nextCount = currentCount + 1
+
+  // Upsert the incremented counter
+  await db.siteSettings.upsert({
+    where: { key: counterKey },
+    update: { value: JSON.stringify({ count: nextCount, year }) },
+    create: { key: counterKey, value: JSON.stringify({ count: nextCount, year }) },
+  }).catch((e) => {
+    console.error('[vapi-webhook] Counter upsert failed (non-fatal):', e)
+  })
+
+  const padded = String(nextCount).padStart(6, '0')
+  return `GPCH-${year}-${padded}`
 }
 
 function str(val: unknown, fallback = ''): string {
@@ -351,18 +378,18 @@ async function handleRegisterComplaint(params: RegisterComplaintParams, toolCall
   const department = await db.department.findUnique({ where: { code: departmentCode } }).catch(() => null)
   const routingRule = await db.routingRule.findUnique({ where: { category: categoryRich } }).catch(() => null)
 
-  const trackingId = generateTrackingId()
+  const trackingId = await generateTrackingId()
   const nowIso = new Date().toISOString()
   const timeline = [
     {
-      status: 'Pending',
+      status: 'NEW',
       ts: nowIso,
       note: `AI voice assistant filed complaint (priority=${priority}, dept=${departmentCode})`,
       by: 'vapi-assistant',
     },
   ]
 
-  // Insert the Complaint row
+  // Insert the Complaint row (with new production fields)
   const complaint = await db.complaint.create({
     data: {
       trackingId,
@@ -370,8 +397,16 @@ async function handleRegisterComplaint(params: RegisterComplaintParams, toolCall
       callerName: name,
       callerPhone: phone,
       callReason: description,
+      // New production fields
+      village: village || null,
+      ward: ward || null,
+      departmentCode,
+      location: location || null,
+      landmark: landmark || null,
+      priority,
+      source: 'vapi',
       category: categoryShort,
-      status: 'Pending',
+      status: 'NEW',
       rawTranscript: description,
       timeline: JSON.stringify(timeline),
     },
@@ -465,7 +500,8 @@ async function handleRegisterComplaint(params: RegisterComplaintParams, toolCall
   )
 
   return json({
-    ok: true,
+    success: true,
+    ok: true, // backward compat
     trackingId,
     complaintId: complaint.id,
     callRecordId: callRecord?.id || null,
@@ -890,7 +926,7 @@ async function handleWebhook(req: Request, server: any): Promise<Response> {
   }
 
   // ─── 6. Generate tracking ID + insert ──────────────────────────────────
-  const trackingId = generateTrackingId()
+  const trackingId = await generateTrackingId()
   const nowIso = new Date().toISOString()
   const timeline = [
     {

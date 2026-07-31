@@ -98,16 +98,33 @@ model ImageAsset {
 
 // ────────────────────────────────────────────────────────────────────────────
 // Complaints (§5 — Vapi voice complaint system)
+// Production-ready complaint registration pipeline.
+// Supports both web-form and Vapi voice complaint filing.
 // ────────────────────────────────────────────────────────────────────────────
 model Complaint {
   id             String   @id @default(cuid())
-  trackingId     String   @unique
+  trackingId     String   @unique // Format: GPCH-2026-000001 (sequential per year)
+
+  // Vapi call linkage
   vapiCallId     String?
-  callerName     String
-  callerPhone    String   // hashed per DPDP, last-4 visible in admin only
-  callReason     String
-  category       String   @default("other") // water | road | school | housing | pension | mgnrega | other
-  status         String   @default("Pending") // Pending | InProgress | Resolved | Rejected
+
+  // Citizen info (phone hashed per DPDP 2023)
+  callerName     String                    // Legacy field — maps to "name"
+  callerPhone    String                    // Hashed phone (MOB_xxxx)
+  callReason     String                    // Legacy field — maps to "description"
+
+  // New production fields (Vapi apiRequest tool)
+  village        String?
+  ward           Int?
+  departmentCode String?
+  location       String?
+  landmark       String?
+  priority       String   @default("medium") // low | medium | high | critical | emergency
+  source         String   @default("web")     // "vapi" | "web"
+
+  category       String   @default("other")   // water | road | school | housing | pension | mgnrega | other
+  status         String   @default("NEW")     // NEW | Pending | InProgress | Resolved | Rejected
+
   rawTranscript  String?
   assignedToId   String?
   assignedTo     User?    @relation("AssignedComplaints", fields: [assignedToId], references: [id])
@@ -118,6 +135,11 @@ model Complaint {
 
   // status timeline (JSON array of {status, ts, note, by})
   timeline       String?
+
+  @@index([status])
+  @@index([category])
+  @@index([departmentCode])
+  @@index([createdAt])
 }
 
 // ────────────────────────────────────────────────────────────────────────────

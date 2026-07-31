@@ -29,12 +29,27 @@ export const complaintCategorySchema = z.enum([
   'water', 'road', 'school', 'housing', 'pension', 'mgnrega', 'other',
 ])
 
-/** Complaint create body */
+/** Complaint create body (legacy web form) */
 export const complaintCreateSchema = z.object({
   callerName: z.string().min(2, 'name_too_short').max(100, 'name_too_long'),
   callerPhone: phoneSchema,
   callReason: z.string().min(10, 'reason_too_short').max(2000, 'reason_too_long'),
   category: complaintCategorySchema.default('other'),
+  vapiCallId: z.string().max(100).optional(),
+})
+
+/** Vapi complaint registration schema (production API) */
+export const vapiComplaintSchema = z.object({
+  name: z.string().min(2, 'name_required').max(100, 'name_too_long'),
+  phone: phoneSchema,
+  village: z.string().max(200).optional().default('Chandra'),
+  ward: z.number().int().min(1, 'invalid_ward').max(15, 'invalid_ward').optional(),
+  category: z.string().min(2, 'category_required').max(50),
+  description: z.string().min(5, 'description_required').max(2000, 'description_too_long'),
+  departmentCode: z.string().min(2, 'department_required').max(30),
+  priority: z.enum(['low', 'medium', 'high', 'critical', 'emergency']).default('medium'),
+  location: z.string().max(300).optional(),
+  landmark: z.string().max(200).optional(),
   vapiCallId: z.string().max(100).optional(),
 })
 
