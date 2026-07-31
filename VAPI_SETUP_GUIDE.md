@@ -44,17 +44,23 @@ You have a transferCall tool (ID: `d2e87d24-8821-4673-8835-efc9df688b5d`).
 
 1. **Tool Name**: `transferCall` (already set)
 2. **Description**: `Transfer the call to a department officer. Use when the citizen wants to speak directly to an officer or when the complaint requires immediate officer attention.`
-3. **Destinations** — Click "Add Destination" for each officer:
+3. **Destinations** — Click "Add Destination" for EVERY person listed on the website:
 
-| Label | Number | Notes |
-|-------|--------|-------|
-| Pradhan (Sangita Mishra) | +919651035021 | Pradhan office |
-| GPA (Balwant Chauhan) | +919839312578 | Secretary/Water/Roads/Electricity |
-| ANM (Archana Singh) | +919528667723 | Health |
-| Headmaster (Altaaf) | +917054306848 | Education |
-| Sanitation (Daya Shankar) | +916392167328 | Sanitation |
-| Pension (Rajendra Mishra) | +918931943436 | Pension |
-| SHO Bara (Emergency) | +919454402820 | Emergency/Police |
+| Label | Number | Role |
+|-------|--------|------|
+| Pradhan (Sangita Mishra) | +919651035021 | Gram Pradhan — all administration, schemes |
+| GPA (Balwant Chauhan) | +919839312578 | Secretary, Water, Roads, Electricity, MGNREGA |
+| Lekhpal (Poonam Maurya) | +919450273074 | Land records, income certificate |
+| ANM (Archana Singh) | +918528667723 | Health, vaccination, pregnancy care |
+| Asha Worker (Anita Singh) | +918188081020 | Health awareness, vaccination help |
+| Sanitation (Daya Shankar) | +916392167328 | Garbage, drainage, cleaning |
+| Panchayat Sahayika (Pushpa Lata) | +918931943436 | Pensions, office assistance |
+| Headmaster (Altaaf Mohammad) | +917054306848 | Primary school, mid-day meal |
+| Asst Teacher (Pushpendra Singh) | +918858881045 | School |
+| Cook (Vimala Devi) | +919519805850 | Mid-day meal cooking |
+| SHO Bara (Emergency) | +919454402820 | Police, emergency, crime |
+| Gudiya Studio (Surya Prasad) | +919792983671 | Offline forms, photos, print |
+| FPS Shop (Ajay Kumar) | +919721144741 | Ration card, family list |
 
 4. **Messages** — Configure what AI says during transfer:
    - **Pre-transfer**: `कृपया रुकिए, मैं आपको सही अधिकारी से जोड़ रही हूँ।` (Please hold, I'm connecting you to the right officer.)
