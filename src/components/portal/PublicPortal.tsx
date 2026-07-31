@@ -42,6 +42,7 @@ import { ComplaintDashboard } from './ComplaintDashboard'
 import { RecentComplaints } from './RecentComplaints'
 import { DepartmentDirectory } from './DepartmentDirectory'
 import { KineticDivider } from './KineticDivider'
+import { PortalActivityFeed } from './PortalActivityFeed'
 
 export function PublicPortal() {
   return (
@@ -60,6 +61,7 @@ export function PublicPortal() {
       <Hero />
       <ComplaintDashboard />
       <RecentComplaints />
+      <PortalActivityFeed />
       <KineticDivider variant="line" />
       <About />
       <RepresentativesSection />

@@ -254,3 +254,47 @@ Unresolved risks / next-phase recommendations:
 - The Radix ScrollArea "container position" warning is cosmetic — could be fixed by wrapping ScrollArea usages in a `position: relative` container, but low priority.
 - Consider adding a CSP (Content-Security-Policy) header in next.config.ts for defense-in-depth.
 - The vapi-webhook `/function-call` endpoint has no auth (BACKEND_AUDIT.md P0) — should add HMAC or origin-check in a future round.
+
+---
+Task ID: 8 (webDevReview cron round 3)
+Agent: main (QA + section header migration + Zod validation + security headers + new feature)
+Task: Assess status, QA, migrate 3 more section headers, add Zod to polls/marketplace, add CSP headers, build PortalActivityFeed feature
+
+Work Log:
+- Read worklog.md (rounds 1-2 complete: SectionHeading, KineticDivider, LivePortalStats, DarkModeToggle fix, touch-target fix, Zod on otp-send/forgot-password/complaints-create, ScrollProgress rAF, TopBar pulse all live).
+- QA via agent-browser: landing + guest entry clean, Hero h1 renders, 41 sections, zero errors on full scroll. No new bugs found — project is stable.
+- ENHANCEMENT 1 — Migrated 3 more section headers to SectionHeading (kinetic mask-up reveal + tricolor divider + bilingual hierarchy):
+  * Schemes.tsx: "योजनाएँ एवं लाभार्थी डेटा" / "Schemes & Beneficiary Data" with BookOpen eyebrow. Preserved the OSINT badges below.
+  * GramSabha.tsx: "ग्राम सभा — कार्यवाही एवं प्रस्ताव" / "Gram Sabha — Proceedings & Resolutions" with Landmark eyebrow.
+  * BudgetSection.tsx: "ग्राम पंचायत चंद्रा — वार्षिक बजट 2025-26" with IndianRupee eyebrow.
+  * Total SectionHeading migrations: 4 (VillageStats round 2 + 3 this round).
+- SECURITY 1 — Zod validation added to polls/[id]/vote/route.ts: replaced manual `typeof body.optionId === 'string'` check with `pollVoteSchema` + `parseBody()` helper. Cleaner, more robust, consistent error format.
+- SECURITY 2 — Zod validation added to marketplace/route.ts POST: replaced ~30 lines of manual typeof checks with `marketplaceCreateSchema` + `parseBody()`. Schema validates titleHi/En, category (enum), sellerNameHi/En, sellerPhone (10-digit), price (int 0-10M), priceType (enum), sellerWard (1-15), imageUrl (URL or empty). Preserved admin auto-approve logic + itemId generation.
+- SECURITY 3 — Added 6 security headers to next.config.ts via `async headers()`:
+  * Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src with fonts.googleapis.com; connect-src with Vapi domains (api.vapi.ai, general.vapi.ai, wss); frame-ancestors 'none'; base-uri 'self'; form-action 'self'.
+  * X-Frame-Options: DENY (clickjacking prevention)
+  * X-Content-Type-Options: nosniff (MIME sniffing prevention)
+  * Referrer-Policy: strict-origin-when-cross-origin
+  * Strict-Transport-Security: max-age=31536000; includeSubDomains (HSTS)
+  * X-Permitted-Cross-Domain-Policies: none
+  * Verified via curl -I: all 6 headers present on responses.
+- NEW FEATURE — PortalActivityFeed component: a unified live timeline showing the 8 most recent portal activities (complaints + announcements + polls) in a single vertical feed. Fetches from /api/stats + /api/announcements + /api/polls in parallel, merges by timestamp, renders as a timeline with type-coded icons (MessageSquare=amber for complaints, Megaphone=saffron for announcements, Vote=emerald for polls). Each item shows type badge, status badge, relative time ("5m ago"/"५ मिनट पहले"), title, meta. Staggered fade-in-left reveal via IntersectionObserver. Added to PublicPortal after RecentComplaints (high visibility position).
+- `bun run lint` — ZERO errors, ZERO warnings.
+- Agent Browser verification: Hero ✓, PortalActivityFeed ("पोर्टल गतिविधि फ़ीड") ✓, Schemes heading ✓, GramSabha heading ✓, Budget heading ✓, zero errors ✓.
+- curl verification: 6 security headers present ✓, polls vote Zod validation ✓, marketplace Zod validation ✓.
+
+Stage Summary:
+- Dev server: port 3000, `/` returns 200. vapi-webhook: port 3003 healthy.
+- All 60+ portal components, 17 admin components, 4 auth components, 47 API routes, 20 Prisma models PRESERVED — zero feature deletion.
+- SECURITY: 5 API routes now have Zod validation (otp-send, forgot-password, complaints/create, polls/vote, marketplace). 6 security headers live (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS, X-Permitted-Cross-Domain-Policies).
+- NEW: PortalActivityFeed component (unified live timeline). Added to PublicPortal.
+- UPGRADED: 3 section headers migrated to SectionHeading (Schemes, GramSabha, BudgetSection). Total: 4/40+ migrated.
+- `bun run lint` passes clean.
+- Agent Browser: all new components verified rendering, zero console errors.
+
+Unresolved risks / next-phase recommendations:
+- Continue migrating remaining ~36 section headers to SectionHeading (GrievanceSection, RTISection, EventsCalendarSection, EducationSection next).
+- Add Zod validation to remaining routes: admin/csv-upload, admin/users, admin/announcements, admin/send-whatsapp.
+- The vapi-webhook `/function-call` endpoint still has no auth (BACKEND_AUDIT.md P0) — should add HMAC or origin-check.
+- Consider rate-limiting on polls/vote and marketplace POST (complaints/create already has it).
+- The PortalActivityFeed could be enhanced with WebSocket/SSE real-time updates (currently fetches once on mount).

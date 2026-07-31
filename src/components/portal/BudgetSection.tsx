@@ -13,6 +13,7 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
 import { IndianRupee, ExternalLink, ShieldCheck, Route, Droplets, GraduationCap, Home, Building2, TrendingUp, Wallet, PiggyBank } from 'lucide-react'
 import { ScrollReveal } from './ScrollReveal'
+import { SectionHeading } from './SectionHeading'
 
 // ── Budget data constants ──
 const TOTAL_BUDGET = 48.72 // in lakh
@@ -140,19 +141,19 @@ export function BudgetSection() {
 
       <div className="container mx-auto px-4 relative z-10">
 
-        {/* ── Section Header ── */}
+        {/* ── Section Header — kinetic mask-up reveal ── */}
         <ScrollReveal delay={0.1}>
-          <div className="mb-12 text-center">
-            <Badge variant="outline" className="mb-4 gap-2 px-4 py-1.5 text-sm border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors">
-              <IndianRupee className="h-4 w-4 text-primary" />
-              {isHi ? 'पंचायत बजट' : 'Panchayat Budget'}
-            </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold section-heading">
-              {isHi
-                ? 'ग्राम पंचायत चंद्रा — वार्षिक बजट 2025-26'
-                : 'Gram Panchayat Chandra — Annual Budget 2025-26'}
-            </h2>
-            <p className="text-base text-muted-foreground mt-4 max-w-2xl mx-auto leading-relaxed">
+          <div className="mb-12">
+            <SectionHeading
+              hi={isHi ? 'ग्राम पंचायत चंद्रा — वार्षिक बजट 2025-26' : 'पंचायत बजट'}
+              en="Gram Panchayat Chandra — Annual Budget 2025-26"
+              eyebrowHi="पंचायत बजट"
+              eyebrowEn="Panchayat Budget"
+              icon={<IndianRupee className="h-3.5 w-3.5" />}
+              align="center"
+              showDivider
+            />
+            <p className="text-base text-muted-foreground mt-4 max-w-2xl mx-auto leading-relaxed text-center">
               {isHi
                 ? 'ग्राम पंचायत विकास योजना (GPDP) एवं eGramSwaraj पोर्टल आधारित अनुमानित बजट। सत्यापित आंकड़े हेतु eGramSwaraj पोर्टल देखें।'
                 : 'Estimated budget based on GPDP & eGramSwaraj portal. For verified figures, check the eGramSwaraj portal.'}

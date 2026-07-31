@@ -1,9 +1,11 @@
 // Citizen Polls API — cast a vote (Task 8-a)
 // - POST /api/polls/[id]/vote  → public; one vote per poll per voterKey
 // voterKey = sha256(ip + user-agent + pollId) — anonymized server-side
+// SECURITY (BACKEND_AUDIT.md): Zod validation on optionId.
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'node:crypto'
 import { db } from '@/lib/db'
+import { pollVoteSchema, parseBody } from '@/lib/validations'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,18 +28,11 @@ export async function POST(
 ) {
   const { id: pollId } = await params
 
-  let body: { optionId?: unknown }
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'invalid_json' }, { status: 400 })
+  const parsed = await parseBody(req, pollVoteSchema)
+  if ('error' in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status })
   }
-
-  const optionId =
-    typeof body.optionId === 'string' ? body.optionId.trim() : ''
-  if (!optionId) {
-    return NextResponse.json({ error: 'missing_optionId' }, { status: 400 })
-  }
+  const optionId = parsed.data.optionId
 
   // Verify poll exists
   const poll = await db.poll.findUnique({

@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollReveal } from './ScrollReveal'
+import { SectionHeading } from './SectionHeading'
 import {
   Landmark,
   Users,
@@ -236,21 +237,25 @@ export function GramSabha() {
   return (
     <section id="gram-sabha" className="section-premium py-16 md:py-20 border-b border-border/40">
       <div className="container mx-auto px-4 relative">
-        {/* Header */}
-        <div className="text-center mb-10">
-          <Badge variant="outline" className="section-header-badge mb-3 gap-1.5">
-            <Landmark className="h-3.5 w-3.5" />
-            {hi ? 'ग्राम सभा' : 'Gram Sabha'}
-          </Badge>
-          <h2 className="text-3xl md:text-4xl font-bold text-gradient-premium">
-            {hi ? 'ग्राम सभा — कार्यवाही एवं प्रस्ताव' : 'Gram Sabha — Proceedings & Resolutions'}
-          </h2>
-          <p className="text-muted-foreground mt-3 max-w-2xl mx-auto">
-            {hi
-              ? 'पारदर्शिता के लिए ग्राम सभा की बैठक कार्यवाही, उपस्थिति एवं पारित प्रस्तावों का विवरण।'
-              : 'Gram Sabha meeting proceedings, attendance, and passed resolutions for transparency.'}
-          </p>
-        </div>
+        {/* Header — kinetic mask-up reveal */}
+        <ScrollReveal delay={0.1}>
+          <div className="mb-10">
+            <SectionHeading
+              hi={hi ? 'ग्राम सभा — कार्यवाही एवं प्रस्ताव' : 'ग्राम सभा'}
+              en="Gram Sabha — Proceedings & Resolutions"
+              eyebrowHi="ग्राम सभा"
+              eyebrowEn="Gram Sabha"
+              icon={<Landmark className="h-3.5 w-3.5" />}
+              align="center"
+              showDivider
+            />
+            <p className="text-muted-foreground mt-4 max-w-2xl mx-auto text-center">
+              {hi
+                ? 'पारदर्शिता के लिए ग्राम सभा की बैठक कार्यवाही, उपस्थिति एवं पारित प्रस्तावों का विवरण।'
+                : 'Gram Sabha meeting proceedings, attendance, and passed resolutions for transparency.'}
+            </p>
+          </div>
+        </ScrollReveal>
 
         {/* Summary stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">

@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress'
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion'
 import { BookOpen, ExternalLink, Database, Lock, Calendar, Droplets, Home, Heart, GraduationCap, Users, HandCoins, FileText, Baby, ArrowRight, ShieldCheck, CheckCircle2, Hammer, IndianRupee, Construction, Clock, Briefcase } from 'lucide-react'
 import { ScrollReveal } from './ScrollReveal'
+import { SectionHeading } from './SectionHeading'
 
 /* ──────────────────────────────────────────────────────────────────────
    Schemes — Gram Panchayat Chandra
@@ -284,17 +285,19 @@ export function Schemes() {
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[var(--saffron)] via-white to-[var(--green)]" />
 
       <div className="container mx-auto px-4 relative">
-        {/* ── Section Header ── */}
+        {/* ── Section Header — kinetic mask-up reveal ── */}
         <ScrollReveal delay={0.1}>
-          <div className="section-header text-center mb-12">
-            <div className="section-header-badge mx-auto">
-              <BookOpen className="h-3.5 w-3.5" />
-              {hi ? 'सरकारी योजनाएँ' : 'Government Schemes'}
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-gradient-premium leading-tight">
-              {hi ? 'योजनाएँ एवं लाभार्थी डेटा' : 'Schemes & Beneficiary Data'}
-            </h2>
-            <p className="text-sm text-muted-foreground mt-3 max-w-2xl mx-auto leading-relaxed">
+          <div className="mb-12">
+            <SectionHeading
+              hi={hi ? 'योजनाएँ एवं लाभार्थी डेटा' : 'सरकारी योजनाएँ'}
+              en="Schemes & Beneficiary Data"
+              eyebrowHi="सरकारी योजनाएँ"
+              eyebrowEn="Government Schemes"
+              icon={<BookOpen className="h-3.5 w-3.5" />}
+              align="center"
+              showDivider
+            />
+            <p className="text-sm text-muted-foreground mt-4 max-w-2xl mx-auto leading-relaxed text-center">
               {hi
                 ? 'OSINT-सत्यापित लाभार्थी डेटा — प्रत्येक रिकॉर्ड का स्रोत URL अनुमान्य है।'
                 : 'OSINT-verified beneficiary data — every record traces to a source URL.'}
