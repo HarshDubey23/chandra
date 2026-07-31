@@ -91,11 +91,11 @@ export function Footer() {
       </div>
 
       {/* ─── Main Footer Content ─── */}
-      <div className="bg-gradient-to-b from-secondary/40 via-secondary/50 to-secondary/70 relative">
-        {/* Subtle pattern overlay */}
-        <div className="absolute inset-0 opacity-[0.015]" style={{
-          backgroundImage: `radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)`,
-          backgroundSize: '24px 24px'
+      <div className="bg-gradient-to-b from-secondary/40 via-secondary/50 to-secondary/70 relative dot-grid">
+        {/* Subtle pattern overlay — dual radial dots for depth */}
+        <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0), radial-gradient(circle at 12px 12px, currentColor 0.5px, transparent 0)`,
+          backgroundSize: '24px 24px, 24px 24px'
         }} />
 
         <div className="container mx-auto px-4 py-10 lg:py-12 relative">
@@ -351,6 +351,18 @@ export function Footer() {
                   &copy; {new Date().getFullYear()} {locale === 'hi' ? 'ग्राम पंचायत चंद्रा। सर्वाधिकार सुरक्षित।' : 'Gram Panchayat Chandra. All Rights Reserved.'}
                 </span>
               </div>
+
+              {/* Kinetic Back-to-Top button */}
+              <button
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                className="group inline-flex items-center gap-1.5 h-8 px-3 rounded-full border border-border/50 bg-background/50 hover:bg-primary/5 hover:border-primary/30 transition-all duration-300"
+                aria-label={locale === 'hi' ? 'शीर्ष पर जाएं' : 'Back to top'}
+              >
+                <span className="text-[10px] font-medium text-muted-foreground group-hover:text-primary transition-colors uppercase tracking-wider">
+                  {locale === 'hi' ? 'शीर्ष' : 'Top'}
+                </span>
+                <ChevronUp className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-all duration-300 group-hover:-translate-y-0.5" />
+              </button>
 
               {/* Tags */}
               <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end">

@@ -1,7 +1,8 @@
 'use client'
-import { Moon, Sun, Monitor } from 'lucide-react'
+import { Moon, Sun, Monitor, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/lib/theme-store'
+import { useI18n } from '@/lib/i18n'
 import { useEffect } from 'react'
 import {
   DropdownMenu,
@@ -19,6 +20,7 @@ import {
  */
 export function DarkModeToggle() {
   const { theme, resolved, toggle, setTheme } = useTheme()
+  const { locale } = useI18n()
 
   // Ensure theme class applied on first paint (matches theme-store applyInitialTheme)
   useEffect(() => {
@@ -58,26 +60,33 @@ export function DarkModeToggle() {
     'Switch to light mode'
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={(e) => {
-            // Plain click (without modifier) cycles modes; dropdown opens via trigger
-            // We use the dropdown for explicit choice. Cycle on the icon button itself.
-            // Actually shadcn DropdownMenuTrigger will open menu on click — so cycle on double-click instead.
-          }}
-          className="h-9 w-9 shadow-sm border-primary/30 hover:border-primary/50 hover:bg-primary/5 transition-all"
-          aria-label={`${tooltipHi} / ${tooltipEn}`}
-          title={`${tooltipHi} / ${tooltipEn}`}
-        >
-          {icon}
-          {theme === 'auto' && (
-            <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-1 ring-background" />
-          )}
-        </Button>
-      </DropdownMenuTrigger>
+    <div className="flex items-center rounded-lg border border-primary/30 shadow-sm overflow-hidden bg-background">
+      {/* Quick-cycle icon button — click to cycle light → dark → auto → light */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => toggle()}
+        className="h-9 w-9 rounded-r-none border-0 hover:bg-primary/5 transition-all relative shrink-0"
+        aria-label={`${tooltipHi} / ${tooltipEn}`}
+        title={`${tooltipHi} / ${tooltipEn}`}
+      >
+        {icon}
+        {theme === 'auto' && (
+          <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-1 ring-background" />
+        )}
+      </Button>
+      {/* Dropdown chevron — opens explicit menu */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-6 rounded-l-none border-0 border-l border-primary/20 hover:bg-primary/5 transition-all shrink-0 px-0"
+            aria-label={locale === 'hi' ? 'थीम विकल्प खोलें' : 'Open theme options'}
+          >
+            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+          </Button>
+        </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           थीम / Theme
@@ -124,6 +133,7 @@ export function DarkModeToggle() {
           )}
         </div>
       </DropdownMenuContent>
-    </DropdownMenu>
+      </DropdownMenu>
+    </div>
   )
 }

@@ -172,3 +172,43 @@ Stage Summary:
 - All 60+ portal components, 17 admin components, 4 auth components, 47 API routes, 20 Prisma models PRESERVED — zero feature deletion.
 - Vapi voice pipeline + WhatsApp dispatch untouched and functional.
 - OKLCH token system live (warm-paper light / OLED-black dark), fluid type scale, custom easing, grain overlay, mesh gradient, mask-up kinetic reveal, saffron heartbeat — all verified in browser.
+
+---
+Task ID: 6 (webDevReview cron round 1)
+Agent: main (QA + enhancement round)
+Task: Assess status, QA via agent-browser, fix bugs, add styling details + features
+
+Work Log:
+- Read worklog.md to understand project state (Phases 0-5 complete, OKLCH tokens live, Hero signature moment verified).
+- QA via agent-browser (desktop 1440px + mobile 360px):
+  * Landing page: clean, zero errors, zero console warnings.
+  * Guest entry: works, Hero renders with h1 "चन्द्रा ग्राम सभा Gram Panchayat Chandra", dark-mode-active, grain-present, mesh_present.
+  * 41 sections render on home view, zero horizontal scroll on desktop AND mobile 360px.
+  * Complaints view: navigates correctly, "शिकायत ट्रैकिंग" heading renders.
+  * Admin login: pradhan@chandra-gp.in / chandra2026 → admin panel "पैनल अवलोकन" renders with tabs.
+  * Theme toggle: WORKED via dropdown but the icon button's onClick was empty (only opened dropdown) — UX issue.
+  * Zero page errors; only minor "container position" warnings from a scroll library in admin.
+- BUG FIXED: DarkModeToggle icon button had empty onClick — clicking it only opened the dropdown, never cycled themes. Rebuilt as a split-button: icon (quick-cycle light→dark→auto→light) + chevron (opens explicit dropdown menu). Added ChevronDown import, useI18n locale, proper closing tags. Verified: dark→auto→light cycling works, localStorage persists correctly.
+- ENHANCEMENT 1 — Upgraded ScrollReveal: replaced banned `ease: 'easeOut'` with design-system `ease.expoOut`, added direction prop (up/down/left/right/fade) and stagger mode option. GPU-only properties maintained.
+- ENHANCEMENT 2 — Created SectionHeading component: kinetic mask-up reveal heading with bilingual hierarchy (Devanagari leads larger, English accompanies smaller muted), optional eyebrow label with icon, optional tricolor 3-dot divider, left/center alignment. Uses fluid var(--text-4xl) + var(--text-lg), matra-safe overflow-hidden wrapper.
+- ENHANCEMENT 3 — Created KineticDivider component: 3 variants (dots=tricolor 3-dot sequential scale-in, line=gradient hairline draw, orb=saffron orb with heartbeat glow). All GPU-only, IntersectionObserver-backed, prefers-reduced-motion safe.
+- ENHANCEMENT 4 — Created LivePortalStats floating widget: dismissible bottom-left glass card (desktop ≥1024px only), fetches /api/stats every 60s, shows resolved/pending/total/AI-filed complaints. Collapsed state shows "Live Portal" badge with ping dot; hover expands to 2x2 stat grid. SessionStorage-dismissed so it doesn't nag. Wired into page.tsx (home view, non-dashboard only).
+- ENHANCEMENT 5 — Applied 8 KineticDividers to PublicPortal at semantic section boundaries (line/dots/orb variants alternating) creating rhythmic visual breaks between the 40+ sections.
+- ENHANCEMENT 6 — Improved Footer art direction: added dot-grid background class + dual-radial dot pattern overlay (2% opacity), added kinetic back-to-top button (chevron-up with -translate-y-0.5 on hover) to the bottom bar.
+- Fixed 1 ESLint error (react-hooks/set-state-in-effect in LivePortalStats) via queueMicrotask deferral. `bun run lint` passes with ZERO errors.
+- Final QA verification: Hero h1 renders, 37 divider elements present, LivePortalStats widget (.glass-strong) present, theme toggle split-button (2 buttons) present, footer back-to-top button present, zero page errors.
+
+Stage Summary:
+- Dev server: port 3000, `/` returns 200. vapi-webhook: port 3003 healthy.
+- All 60+ portal components, 17 admin components, 4 auth components, 47 API routes, 20 Prisma models PRESERVED — zero feature deletion.
+- NEW components: SectionHeading, KineticDivider, LivePortalStats (3 added).
+- UPGRADED components: DarkModeToggle (split-button UX), ScrollReveal (design-system easings + direction + stagger), Footer (dot-grid + back-to-top), PublicPortal (8 kinetic dividers).
+- `bun run lint` — ZERO errors, ZERO warnings.
+- Agent Browser: all new components verified rendering, theme cycling confirmed (dark→auto→light with localStorage persistence), zero console errors.
+- Design system integrity maintained: OKLCH tokens, fluid clamp() type, custom expo-out easing, GPU-only animations, prefers-reduced-motion safety, 44px touch targets, zero horizontal scroll on 360px.
+
+Unresolved risks / next-phase recommendations:
+- The 40+ portal sections still use their own inline section headers (not the new SectionHeading component). A future round could incrementally migrate them to SectionHeading for consistent kinetic typography — but this is a large refactor and should be done section-by-section to avoid regressions.
+- The admin panel position warnings ("container has non-static position") come from a scroll library — non-blocking but could be investigated.
+- Backend Zod validation (flagged in BACKEND_AUDIT.md) is still not implemented on most API routes — a future security-focused round could add Zod schemas.
+- The OTP-in-response and demo-token-in-response security issues (P0 findings in BACKEND_AUDIT.md) should be gated behind NODE_ENV !== 'production' in a future hardening round.

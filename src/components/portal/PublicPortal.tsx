@@ -41,6 +41,7 @@ import { LocationMap } from './LocationMap'
 import { ComplaintDashboard } from './ComplaintDashboard'
 import { RecentComplaints } from './RecentComplaints'
 import { DepartmentDirectory } from './DepartmentDirectory'
+import { KineticDivider } from './KineticDivider'
 
 export function PublicPortal() {
   return (
@@ -59,10 +60,13 @@ export function PublicPortal() {
       <Hero />
       <ComplaintDashboard />
       <RecentComplaints />
+      <KineticDivider variant="line" />
       <About />
       <RepresentativesSection />
+      <KineticDivider variant="dots" />
       <Schemes />
       <SchemeEligibilityChecker />
+      <KineticDivider variant="line" />
       <VillageStats />
       <VillageMap />
       <CensusSection />
@@ -70,30 +74,36 @@ export function PublicPortal() {
       <WardMap />
       <StaffDirectory />
       <DepartmentDirectory />
+      <KineticDivider variant="dots" />
       <BudgetSection />
       <EducationSection />
       <MidDayMealMenu />
       <SHGDirectory />
       <HealthSanitationSection />
       <Infrastructure />
+      <KineticDivider variant="line" />
       <LocationMap />
       <EmergencyContacts />
       <WeatherAgriSection />
       <VillageMarketplace />
+      <KineticDivider variant="dots" />
       <GrievanceSection />
       <CitizenServiceTracker />
       <EventsCalendarSection />
       <GramSabha />
       <PollsSection />
+      <KineticDivider variant="line" />
       <RTISection />
       <DownloadsSection />
       <SuccessStories />
       <FAQSection />
+      <KineticDivider variant="dots" />
       <PhotoGallery />
       <VideoGallery />
       <VillageTimeline />
       <Announcements />
       <BlogSection />
+      <KineticDivider variant="orb" />
       <PortalFeedback />
       <AboutPortal />
       <ContactUsSection />
