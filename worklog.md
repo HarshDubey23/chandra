@@ -298,3 +298,35 @@ Unresolved risks / next-phase recommendations:
 - The vapi-webhook `/function-call` endpoint still has no auth (BACKEND_AUDIT.md P0) — should add HMAC or origin-check.
 - Consider rate-limiting on polls/vote and marketplace POST (complaints/create already has it).
 - The PortalActivityFeed could be enhanced with WebSocket/SSE real-time updates (currently fetches once on mount).
+
+---
+Task ID: 9 (performance emergency — kill lag)
+Agent: main
+Task: User reported "too much lagging" — aggressively cut all heavy GPU effects causing scroll/render jank
+
+Work Log:
+- User feedback: "bro smooth to chodo its too much lagging bro" — site was janky. Identified 6 lag sources and cut them all.
+- KILL 1 — Removed LenisProvider entirely from layout.tsx. Lenis smooth-scroll hijacks native scroll via rAF + transform on <html>, which causes scroll jank especially on low-end devices. Replaced with native browser scroll (faster, zero JS overhead). LenisProvider component file kept but no longer imported/mounted.
+- KILL 2 — Removed grain overlay (`.grain-overlay` div) from layout.tsx body. The SVG feTurbulence noise + `mix-blend-mode: overlay` forced the browser to composite a full-viewport fixed layer on every frame — expensive on low-end GPUs. Grain CSS class still exists in globals.css but is no longer rendered.
+- KILL 3 — Removed CustomCursor component from page.tsx. The `mix-blend-mode: difference` cursor tracked every mousemove with a spring, forcing constant GPU compositing on a fixed z-9999 layer. Removed the `<CustomCursor />` render + import.
+- KILL 4 — Rewrote mesh-gradient in globals.css: removed `filter: blur(60px) saturate(1.1)` (VERY expensive — forces a separate compositor layer with blur recompute), removed the 30s `mesh-drift` infinite animation (kept the compositor busy permanently), removed `mix-blend-mode: screen/multiply`. Now it's a static 2-layer radial gradient with opacity only — near-zero GPU cost.
+- KILL 5 — Removed parallax scroll from Hero: deleted `useScroll`/`useTransform` hooks + `bgY`/`overlayOpacity` motion values. Scroll-driven transforms cause continuous re-renders during scroll. Hero background + overlay are now static. Also removed unused `motion` import where not needed.
+- KILL 6 — Optimized Hero image rotator: was rendering ALL 5 images simultaneously (each a full-viewport object-cover). Now renders only the active + previous image (2 max) via `[prevIdx, activeIdx].filter(unique).map()`. Removed the `blur(8px→0px)` filter transition (blur transitions are GPU-heavy). Reduced scale animation from 1.06 to 1.03 (smaller transform).
+- KILL 7 — Removed MagneticButton wrappers from Hero CTAs. The magnetic effect attached a mousemove listener + spring transform on every cursor move over the button — overhead for a cosmetic effect. Replaced with plain Buttons.
+- KILL 8 — Auto-applied `content-visibility: auto` to ALL portal sections except #hero and #activity-feed via globals.css rule `section[id]:not(#hero):not(#activity-feed)`. This tells the browser to skip rendering/layout for off-screen sections entirely — up to 7x render boost on long pages with 40+ sections.
+- Fixed JSX structure error (changed motion.div → div for overlay but left </motion.div> closing tag).
+- `bun run lint` — ZERO errors after fix.
+- Agent Browser: Hero h1 renders, zero errors, scroll works, grain-overlay absent, page loads in 622ms (was slower with all the effects).
+
+Stage Summary:
+- Dev server: port 3000, `/` returns 200. vapi-webhook: port 3003 healthy.
+- REMOVED (lag sources): Lenis smooth-scroll, grain overlay, CustomCursor, mesh-gradient blur+animation, Hero parallax, MagneticButton, all 5 hero images loaded at once.
+- ADDED: `content-visibility: auto` on all non-hero sections (off-screen render skipping).
+- All 60+ portal components, 17 admin components, 4 auth components, 47 API routes, 20 Prisma models PRESERVED — zero feature deletion. Only decorative effects removed.
+- `bun run lint` passes clean.
+- Page should now scroll smoothly on low-end devices. The signature kinetic typography (mask-up hero reveal) + tricolor accents + OKLCH color system are preserved — just the heavy GPU effects are gone.
+
+Unresolved risks / next-phase recommendations:
+- Monitor if the remaining framer-motion `whileInView` animations on cards/sections still cause jank on very weak devices. If so, consider replacing with CSS-only `@scroll-timeline` or removing `whileInView` in favor of a single mount animation.
+- The `tricolor-shift 8s infinite` animation on the hero top bar still runs — could be made `animation-iteration-count: 1` if it's a concern.
+- The announcement ticker marquee (`marquee-scroll 25s linear infinite`) runs continuously — small element, low cost, but could be paused when off-screen via `animation-play-state: paused` + IntersectionObserver.

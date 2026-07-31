@@ -15,7 +15,6 @@ import { EmergencyQuickDial } from '@/components/portal/EmergencyQuickDial'
 import { QuickStats } from '@/components/portal/QuickStats'
 import { ServiceWorkerRegister } from '@/components/portal/ServiceWorkerRegister'
 import { InstallPrompt } from '@/components/portal/InstallPrompt'
-import { CustomCursor } from '@/components/portal/CustomCursor'
 import { LivePortalStats } from '@/components/portal/LivePortalStats'
 import { LandingPage } from '@/components/auth/LandingPage'
 import { CitizenDashboard } from '@/components/auth/CitizenDashboard'
@@ -79,7 +78,6 @@ export default function Home() {
       {view === 'home' && !showDashboard && <QuickStats />}
       <ServiceWorkerRegister />
       <InstallPrompt />
-      <CustomCursor />
       {view === 'home' && !showDashboard && <LivePortalStats />}
     </div>
   )

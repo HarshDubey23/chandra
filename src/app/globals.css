@@ -2754,31 +2754,18 @@ section[id] {
 }
 .dark .grain-overlay { opacity: 0.05; mix-blend-mode: screen; }
 
-/* ── Multi-layered mesh gradient — hero background atmosphere ── */
+/* ── Mesh gradient — STATIC (was animated 60px blur, caused GPU lag) ── */
 .mesh-gradient {
   position: absolute;
-  inset: -20%;
+  inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(40% 50% at 20% 30%, oklch(0.75 0.16 60 / 0.35), transparent 60%),
-    radial-gradient(35% 45% at 80% 20%, oklch(0.72 0.15 155 / 0.28), transparent 60%),
-    radial-gradient(50% 60% at 50% 100%, oklch(0.82 0.14 85 / 0.20), transparent 70%);
-  filter: blur(60px) saturate(1.1);
-  mix-blend-mode: screen;
-  animation: mesh-drift 30s var(--ease-expo-in-out) infinite alternate;
-  will-change: transform;
-}
-:root:not(.dark) .mesh-gradient { mix-blend-mode: multiply; opacity: 0.6; }
-.dark .mesh-gradient {
-  background:
     radial-gradient(40% 50% at 20% 30%, oklch(0.75 0.16 60 / 0.30), transparent 60%),
-    radial-gradient(35% 45% at 80% 20%, oklch(0.72 0.15 155 / 0.22), transparent 60%),
-    radial-gradient(50% 60% at 50% 100%, oklch(0.82 0.14 85 / 0.15), transparent 70%);
+    radial-gradient(35% 45% at 80% 20%, oklch(0.72 0.15 155 / 0.22), transparent 60%);
+  /* NO blur filter, NO animation — keeps GPU idle */
 }
-@keyframes mesh-drift {
-  0%   { transform: translate3d(-2%, -1%, 0) scale(1); }
-  100% { transform: translate3d(2%, 1%, 0) scale(1.05); }
-}
+:root:not(.dark) .mesh-gradient { opacity: 0.5; }
+.dark .mesh-gradient { opacity: 0.4; }
 
 /* ── Dot-grid utility (dashboard / footer dark sections) ── */
 .dot-grid {
@@ -2896,6 +2883,11 @@ section[id] {
 .cv-auto--lg {
   content-visibility: auto;
   contain-intrinsic-size: auto 1000px;
+}
+/* Auto-apply to all portal sections except hero (skips off-screen rendering) */
+section[id]:not(#hero):not(#activity-feed) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
 }
 
 /* ── GPU layer promotion for actively animating elements ── */

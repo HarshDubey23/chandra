@@ -6,10 +6,9 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { ShieldCheck, Phone, MapPin, FileSearch, Mic, ArrowRight, Sun, Users, Landmark, Home, GraduationCap, Utensils, Briefcase, BookOpen } from 'lucide-react'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { motion, useScroll, useTransform } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { startVapiCall } from '@/lib/vapi'
 import { useCountUp } from '@/lib/use-count-up'
-import { MagneticButton } from './MagneticButton'
 import { staggerContainer, staggerContainerCinematic, maskUpChild, fadeUpChild, scaleUpChild, fadeInChild, viewportOnce } from '@/lib/motion/variants'
 import { ease, dur } from '@/lib/motion/springs'
 
@@ -44,13 +43,7 @@ export function Hero() {
   const [mounted, setMounted] = useState(false)
   const sectionRef = useRef<HTMLElement>(null)
 
-  // Parallax scroll effect — GPU-only transform
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ['start start', 'end start'],
-  })
-  const bgY = useTransform(scrollYProgress, [0, 1], ['0%', '20%'])
-  const overlayOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0.6])
+  // Parallax REMOVED — scroll-driven transforms were causing jank on low-end devices
 
   useEffect(() => {
     // Defer to avoid synchronous setState in effect (react-hooks/set-state-in-effect)
@@ -119,40 +112,39 @@ export function Hero() {
       style={{ contain: 'layout paint style' }}
     >
       {/* ═══════════════════════════════════════════════════════════════
-          LAYER 0 — Cinematic Background: Mesh Gradient + Image Rotator
+          LAYER 0 — Background (static mesh + current image only, no parallax)
           ═══════════════════════════════════════════════════════════════ */}
       <div className="absolute inset-0 z-0" aria-hidden="true">
-        {/* Mesh gradient atmosphere — drifts over 30s */}
+        {/* Mesh gradient — static, no animation */}
         <div className="mesh-gradient" />
 
-        {/* Image rotator — blur-awakens on mount */}
-        {HERO_IMAGES.map((img, i) => (
-          <motion.div
-            key={img.src}
-            className="absolute inset-0 gpu-layer"
-            initial={false}
-            animate={{
-              opacity: i === activeIdx ? 1 : 0,
-              scale: i === activeIdx ? 1.06 : 1.0,
-            }}
-            transition={{ duration: 2.5, ease: ease.expoOut }}
-            style={{ y: bgY }}
-          >
-            <img
-              src={img.src}
-              alt=""
-              loading={i === 0 ? 'eager' : 'lazy'}
-              className="h-full w-full object-cover"
-              style={{
-                filter: mounted && i === activeIdx ? 'blur(0px)' : 'blur(8px)',
-                transition: `filter ${dur.slow}s ${ease.expoOut}`,
+        {/* Image rotator — only render active + prev image (was rendering all 5) */}
+        {[prevIdx, activeIdx].filter((v, i, a) => a.indexOf(v) === i).map((i) => {
+          const img = HERO_IMAGES[i]
+          if (!img) return null
+          return (
+            <motion.div
+              key={img.src}
+              className="absolute inset-0"
+              initial={false}
+              animate={{
+                opacity: i === activeIdx ? 1 : 0,
+                scale: i === activeIdx ? 1.03 : 1.0,
               }}
-            />
-          </motion.div>
-        ))}
+              transition={{ duration: 1.5, ease: ease.expoOut }}
+            >
+              <img
+                src={img.src}
+                alt=""
+                loading={i === 0 ? 'eager' : 'lazy'}
+                className="h-full w-full object-cover"
+              />
+            </motion.div>
+          )
+        })}
 
-        {/* Dramatic multi-layer gradient overlay */}
-        <motion.div className="absolute inset-0" style={{ opacity: overlayOpacity }}>
+        {/* Multi-layer gradient overlay — static opacity (was scroll-driven) */}
+        <div className="absolute inset-0">
           {/* Base dark overlay */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-black/80" />
           {/* Saffron tint from left */}
@@ -163,7 +155,7 @@ export function Hero() {
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
           {/* Center radial glow */}
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(0,0,0,0.4)_100%)]" />
-        </motion.div>
+        </div>
 
         {/* Subtle tricolor top bar */}
         <div
@@ -324,7 +316,6 @@ export function Hero() {
             animate={mounted ? 'visible' : 'hidden'}
             className="flex flex-wrap gap-3 pt-1"
           >
-            <MagneticButton strength={10}>
               <Button
                 onClick={() => setView('complaints')}
                 size="lg"
@@ -333,8 +324,6 @@ export function Hero() {
                 <FileSearch className="h-4.5 w-4.5" />
                 {locale === 'hi' ? 'शिकायत ट्रैक करें' : 'Track Complaint'}
               </Button>
-            </MagneticButton>
-            <MagneticButton strength={10}>
               <Button
                 onClick={() => {
                   setView('home')
@@ -347,7 +336,6 @@ export function Hero() {
                 {locale === 'hi' ? 'योजनाएँ देखें' : 'View Schemes'}
                 <ArrowRight className="h-4.5 w-4.5" />
               </Button>
-            </MagneticButton>
           </motion.div>
 
           {/* ── AI Voice Complaint Line — Simplified Card ── */}

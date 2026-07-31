@@ -3,7 +3,7 @@ import { Inter, Noto_Sans_Devanagari, Geist_Mono, DM_Serif_Display } from "next/
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
-import { LenisProvider } from "@/components/providers/LenisProvider";
+// LenisProvider removed — was causing scroll jank. Native scroll is faster.
 
 // ── Self-hosted variable fonts via next/font (DESIGN_INTELLIGENCE §2) ──
 // adjustFontFallback prevents FOUT/CLS; display:swap avoids invisible text.
@@ -149,9 +149,8 @@ export default function RootLayout({
         className={`${inter.variable} ${notoDevanagari.variable} ${geistMono.variable} ${dmSerif.variable} antialiased bg-background text-foreground min-h-screen flex flex-col overflow-x-hidden`}
         style={{ fontFamily: "var(--font-inter), var(--font-devanagari), system-ui, sans-serif" }}
       >
-        {/* SVG grain overlay — fixed, pointer-events:none, 3.5%/5% opacity */}
-        <div className="grain-overlay" aria-hidden="true" />
-        <LenisProvider>{children}</LenisProvider>
+        {/* Grain overlay removed — mix-blend-mode was causing compositing lag */}
+        {children}
         <Toaster />
         <SonnerToaster position="top-right" richColors />
       </body>
