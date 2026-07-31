@@ -7,7 +7,7 @@ import { Mic, Loader2, PhoneOff, FileText, Phone, MapPin, Clock, AlertTriangle, 
 import { useUI } from '@/lib/ui-store'
 
 type CallState = 'idle' | 'connecting' | 'active' | 'ending'
-const CONNECT_TIMEOUT_MS = 20_000
+const CONNECT_TIMEOUT_MS = 90_000 // 90 seconds — Vapi can take time to set up audio
 
 interface CallSummary {
   category: string | null
@@ -190,13 +190,14 @@ export function AIVoiceButton() {
     setDetectedCategory(null)
     setLiveTransfer(null)
     setShowPanel(true)
+    // 90s timeout — only shows a warning, does NOT kill the call
+    // Vapi SDK may take time to set up audio (Krisp noise cancellation, WebRTC)
     timeoutRef.current = setTimeout(() => {
       if (stateRef.current === 'connecting') {
-        stopVapiCall()
+        // Don't kill the call — just show a hint that it's taking long
         setError(locale === 'hi'
-          ? 'कॉल कनेक्ट नहीं हो पाया (20 सेकंड टाइमआउट)। Vapi असिस्टेंट को पब्लिश करें या Public Key चेक करें।'
-          : 'Call connection timed out (20s). Publish the assistant or check the Public Key.')
-        setState('idle')
+          ? 'कनेक्ट होने में समय लग रहा है... कृपया प्रतीक्षा करें। यदि 2 मिनट में कनेक्ट नहीं होता तो रीफ्रेश करें।'
+          : 'Taking long to connect... please wait. If it does not connect in 2 minutes, refresh.')
       }
     }, CONNECT_TIMEOUT_MS)
     try {

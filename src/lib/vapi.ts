@@ -64,25 +64,40 @@ async function getVapi() {
   if (!key) return null
   if (!vapi) {
     const Vapi = (await import('@vapi-ai/web')).default
-    vapi = new (Vapi as any)(key, undefined, { noiseCancellation: false } as any)
+    vapi = new (Vapi as any)(key)
 
     vapi.on('call-start', () => { activeCall = true; notifyState?.(true) })
+    vapi.on('call-start-success', () => { activeCall = true; notifyState?.(true) })
     vapi.on('call-end', () => { activeCall = false; notifyState?.(false) })
+    // Backup: speech-start means the call IS active (AI is talking)
+    vapi.on('speech-start', () => { if (!activeCall) { activeCall = true; notifyState?.(true) } })
 
     vapi.on('call-start-progress', () => {
-      // Swallow progress events silently — they're noisy and not actionable
+      // Swallow progress events silently
     })
     vapi.on('call-start-failed', (e: unknown) => {
-      // Only forward real connection failures (not meeting-ended noise)
       if (!isMeetingEndedError(e)) {
         for (const fn of (handlers.get('error') || [])) fn(e)
       }
     })
+
+    // CRITICAL: Swallow Krisp/AudioWorklet errors — they don't kill the call
+    // The call still works for voice even if noise cancellation fails
     vapi.on('error', (e: unknown) => {
-      // Suppress ALL "meeting ended" / "call ended" errors — these are normal
-      // when a call finishes and should NOT surface to the user or console.
-      if (isMeetingEndedError(e)) return
-      // Forward genuine errors to UI handlers
+      const msg = String((e as any)?.message ?? e?.toString?.() ?? e ?? '')
+      // Suppress: meeting ended, Krisp errors, worklet errors, audio level observer errors
+      if (
+        isMeetingEndedError(e) ||
+        msg.includes('Krisp') ||
+        msg.includes('WORKLET') ||
+        msg.includes('worklet') ||
+        msg.includes('audio level') ||
+        msg.includes('noiseFilter') ||
+        msg.includes('noise filter') ||
+        msg.includes('addModule')
+      ) {
+        return // silently swallow — call continues without noise cancellation
+      }
       for (const fn of (handlers.get('error') || [])) fn(e)
     })
 
