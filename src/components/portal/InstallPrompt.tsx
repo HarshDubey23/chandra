@@ -30,7 +30,7 @@ export function InstallPrompt() {
 
     // Detect iOS (no beforeinstallprompt support — need manual instructions)
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
-    setIsIOS(iOS)
+    queueMicrotask(() => setIsIOS(iOS))
 
     // Check if user dismissed recently
     const dismissed = localStorage.getItem(DISMISS_KEY)
