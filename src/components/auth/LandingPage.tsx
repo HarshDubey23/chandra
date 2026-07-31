@@ -444,7 +444,7 @@ export function LandingPage() {
   ]
 
   const stats = [
-    { icon: Users, end: 3500, suffix: '+', labelHi: 'निवासी', labelEn: 'Residents' },
+    { icon: Users, end: 1247, suffix: '', labelHi: 'निवासी', labelEn: 'Residents' },
     { icon: Building2, end: 11, suffix: '', labelHi: 'वार्ड', labelEn: 'Wards' },
     { icon: BookOpen, end: 11, suffix: '+', labelHi: 'योजनाएं', labelEn: 'Schemes' },
     { icon: Shield, end: 24, suffix: '×7', labelHi: 'सुनवाई', labelEn: 'Support' },
@@ -657,35 +657,6 @@ export function LandingPage() {
                     </a>
                   </motion.div>
 
-                  {/* Testimonial / Quote */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.9, duration: 0.4 }}
-                    className="mb-6 text-center lg:text-left max-w-md"
-                  >
-                    <div className="flex items-center gap-1 mb-2 justify-center lg:justify-start">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <Star key={s} className="h-4 w-4 fill-amber-400 text-amber-400" />
-                      ))}
-                      <span className="text-xs text-[#9CA3AF] ml-1 font-medium">4.9/5</span>
-                    </div>
-                    <p className="text-sm text-[#1F2937]/80 italic leading-relaxed">
-                      {hi
-                        ? '"शिकायत समाधान दर 85% — डिजिटल पोर्टल से चंद्रा के निवासियों को लाभ।"'
-                        : '"Complaint resolution rate at 85% — residents benefit from the digital portal."'}
-                    </p>
-                    <div className="flex items-center gap-2 mt-2 justify-center lg:justify-start">
-                      <span className="text-xs font-semibold text-[#1F2937]">
-                        {hi ? 'श्रीमती संगीता मिश्रा' : 'Shrimati Sangita Mishra'}
-                      </span>
-                      <span className="text-[10px] text-[#D1D5DB]">•</span>
-                      <span className="text-xs text-[#6B7280]">
-                        {hi ? 'ग्राम प्रधान' : 'Gram Pradhan'}
-                      </span>
-                    </div>
-                  </motion.div>
-
                   {/* Achievement badges */}
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -696,10 +667,6 @@ export function LandingPage() {
                     <div className="flex items-center gap-1.5 text-[11px] text-[#4CAF50] bg-[#4CAF50]/8 px-3 py-1.5 rounded-lg border border-[#4CAF50]/15 font-medium">
                       <Award className="h-3 w-3" />
                       DPDP 2023
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[11px] text-[#F26A2E] bg-[#F26A2E]/8 px-3 py-1.5 rounded-lg border border-[#F26A2E]/15 font-medium">
-                      <TrendingUp className="h-3 w-3" />
-                      {hi ? '85% समाधान' : '85% Resolved'}
                     </div>
                     <div className="flex items-center gap-1.5 text-[11px] text-[#6B7280] bg-[#6B7280]/8 px-3 py-1.5 rounded-lg border border-[#6B7280]/15 font-medium">
                       <Shield className="h-3 w-3" />
@@ -906,28 +873,6 @@ export function LandingPage() {
                                 >
                                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </button>
-                              </div>
-                            </div>
-
-                            {/* Demo credentials */}
-                            <div className="rounded-xl p-4 bg-[#F26A2E]/5 border border-[#F26A2E]/10">
-                              <div className="flex items-start gap-2">
-                                <Sparkles className="h-4 w-4 text-[#F26A2E] mt-0.5 shrink-0" />
-                                <div>
-                                  <p className="text-xs font-semibold text-[#1F2937] mb-1">
-                                    {hi ? 'डेमो लॉग इन' : 'Demo Credentials'}
-                                  </p>
-                                  <p className="text-[11px] text-[#6B7280]">
-                                    {hi
-                                      ? 'प्रधान: pradhan@chandra-gp.in / chandra2026'
-                                      : 'Pradhan: pradhan@chandra-gp.in / chandra2026'}
-                                  </p>
-                                  <p className="text-[11px] text-[#6B7280]">
-                                    {hi
-                                      ? 'सचिव: gpa@chandra-gp.in / secretary2026'
-                                      : 'Secretary: gpa@chandra-gp.in / secretary2026'}
-                                  </p>
-                                </div>
                               </div>
                             </div>
 

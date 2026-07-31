@@ -5,11 +5,10 @@ import { ScrollReveal } from './ScrollReveal'
 import { SectionHeading } from './SectionHeading'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import {
-  Users, Home, Droplet, Store, Phone, MapPin, FileText,
-  Heart, Accessibility, Baby, Wrench, Utensils, Image as ImageIcon,
-  CheckCircle2, Clock, AlertCircle, ChevronDown, ChevronUp, Phone as PhoneIcon,
+  Users, Home, Droplet, Store, Phone, FileText,
+  Heart, Accessibility, Wrench, Utensils,
+  CheckCircle2, Phone as PhoneIcon, MapPin, Lock,
 } from 'lucide-react'
 
 type Tab = 'pensions' | 'housing' | 'ration' | 'handpumps' | 'offline-help' | 'school-team'
@@ -89,29 +88,61 @@ export function VillageRecords() {
   )
 }
 
-// ── Pensions View ──
+// ── Privacy notice (shown when beneficiary names are available only at office) ──
+function PrivacyNotice({ hi }: { hi: boolean }) {
+  return (
+    <Card className="bg-amber-500/5 border-amber-500/20 mt-4">
+      <CardContent className="p-3 text-xs text-muted-foreground flex items-start gap-2">
+        <Lock className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+        <span>
+          {hi
+            ? 'व्यक्तिगत डेटा सुरक्षा (DPDP 2023) के तहत लाभार्थियों के नाम केवल पंचायत कार्यालय में उपलब्ध हैं। कुल संख्या यहाँ दिखाई गई है।'
+            : 'Under DPDP 2023, beneficiary names are available only at the panchayat office. Total counts are shown here.'}
+        </span>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ── Pensions View — shows scheme info + counts, NO fake names ──
 function PensionsView({ hi }: { hi: boolean }) {
   const pensions = [
-    { key: 'widow', data: { titleHi: 'विधवा पेंशन', titleEn: 'Widow Pension', amount: 1000, count: 8, beneficiaries: [
-      { name: hi ? 'श्रीमती रामवती' : 'Smt. Ramwati', ward: 3, status: 'active', since: '2023-04' },
-      { name: hi ? 'श्रीमती कमला' : 'Smt. Kamla', ward: 5, status: 'active', since: '2022-11' },
-      { name: hi ? 'श्रीमती सीता' : 'Smt. Sita', ward: 2, status: 'active', since: '2023-01' },
-      { name: hi ? 'श्रीमती गीता' : 'Smt. Geeta', ward: 7, status: 'active', since: '2022-06' },
-      { name: hi ? 'श्रीमती राधा' : 'Smt. Radha', ward: 4, status: 'pending', since: '2024-03' },
-    ]}, icon: Heart, color: 'text-pink-500 bg-pink-500/10' },
-    { key: 'oldAge', data: { titleHi: 'वृद्धावस्था पेंशन (IGNOAPS)', titleEn: 'Old Age Pension (IGNOAPS)', amount: 1000, count: 14, beneficiaries: [
-      { name: hi ? 'श्री रामप्रसाद' : 'Shri Ramprasad', ward: 1, status: 'active', since: '2021-06' },
-      { name: hi ? 'श्री मुन्नीलाल' : 'Shri Munnilal', ward: 3, status: 'active', since: '2020-11' },
-      { name: hi ? 'श्रीमती फूलमती' : 'Smt. Phoolmati', ward: 5, status: 'active', since: '2022-03' },
-      { name: hi ? 'श्री हरिश्चंद्र' : 'Shri Harishchandra', ward: 2, status: 'active', since: '2021-09' },
-      { name: hi ? 'श्री विश्वनाथ मिश्र' : 'Shri Vishwanath Mishra', ward: 4, status: 'active', since: '2022-08' },
-      { name: hi ? 'श्री राजेंद्र मिश्र' : 'Shri Rajendra Mishra', ward: 6, status: 'active', since: '2021-12' },
-    ]}, icon: Users, color: 'text-amber-500 bg-amber-500/10' },
-    { key: 'disability', data: { titleHi: 'विकलांग पेंशन', titleEn: 'Disability Pension', amount: 1000, count: 5, beneficiaries: [
-      { name: hi ? 'श्री अमित' : 'Shri Amit', ward: 3, status: 'active', since: '2023-02' },
-      { name: hi ? 'श्री रवि' : 'Shri Ravi', ward: 5, status: 'active', since: '2022-07' },
-      { name: hi ? 'श्रीमती प्रियंका' : 'Smt. Priyanka', ward: 1, status: 'active', since: '2023-09' },
-    ]}, icon: Accessibility, color: 'text-emerald-500 bg-emerald-500/10' },
+    {
+      titleHi: 'विधवा पेंशन',
+      titleEn: 'Widow Pension',
+      amount: 1000,
+      count: 8,
+      icon: Heart,
+      color: 'text-pink-500 bg-pink-500/10',
+      descHi: 'विधवा महिलाओं के लिए मासिक पेंशन।',
+      descEn: 'Monthly pension for widowed women.',
+      applyHi: 'पंचायत कार्यालय में आवेदन करें — मृत्यु प्रमाण पत्र, आधार, बैंक पासबुक आवश्यक।',
+      applyEn: 'Apply at panchayat office — death certificate, Aadhaar, bank passbook required.',
+    },
+    {
+      titleHi: 'वृद्धावस्था पेंशन (IGNOAPS)',
+      titleEn: 'Old Age Pension (IGNOAPS)',
+      amount: 1000,
+      count: 14,
+      icon: Users,
+      color: 'text-amber-500 bg-amber-500/10',
+      descHi: '60+ वर्ष के वरिष्ठ नागरिकों के लिए मासिक पेंशन।',
+      descEn: 'Monthly pension for senior citizens aged 60+.',
+      applyHi: 'पंचायत कार्यालय में आवेदन करें — आयु प्रमाण पत्र, आधार, बैंक पासबुक आवश्यक।',
+      applyEn: 'Apply at panchayat office — age proof, Aadhaar, bank passbook required.',
+    },
+    {
+      titleHi: 'विकलांग पेंशन',
+      titleEn: 'Disability Pension',
+      amount: 1000,
+      count: 5,
+      icon: Accessibility,
+      color: 'text-emerald-500 bg-emerald-500/10',
+      descHi: '40%+ विकलांगता वाले व्यक्तियों के लिए मासिक पेंशन।',
+      descEn: 'Monthly pension for persons with 40%+ disability.',
+      applyHi: 'पंचायत कार्यालय में आवेदन करें — विकलांगता प्रमाण पत्र, आधार, बैंक पासबुक आवश्यक।',
+      applyEn: 'Apply at panchayat office — disability certificate, Aadhaar, bank passbook required.',
+    },
   ]
 
   return (
@@ -119,116 +150,95 @@ function PensionsView({ hi }: { hi: boolean }) {
       {pensions.map(p => {
         const Icon = p.icon
         return (
-          <Card key={p.key} className="overflow-hidden">
-            <div className="flex items-center gap-3 p-4 border-b border-border/40 bg-muted/30">
-              <div className={`h-10 w-10 rounded-xl grid place-items-center ${p.color}`}>
-                <Icon className="h-5 w-5" />
+          <Card key={p.titleEn}>
+            <div className="flex items-start gap-4 p-5">
+              <div className={`h-12 w-12 rounded-xl grid place-items-center shrink-0 ${p.color}`}>
+                <Icon className="h-6 w-6" />
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-foreground">{hi ? p.data.titleHi : p.data.titleEn}</h3>
-                <p className="text-xs text-muted-foreground">₹{p.data.amount}/month • {p.data.count} {hi ? 'लाभार्थी' : 'beneficiaries'}</p>
-              </div>
-              <Badge variant="secondary" className="gap-1">
-                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                {p.data.beneficiaries.length} {hi ? 'दिखाए गए' : 'shown'}
-              </Badge>
-            </div>
-            <div className="divide-y divide-border/30">
-              {p.data.beneficiaries.map((b, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/20 transition-colors">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 text-primary grid place-items-center text-xs font-bold">
-                    {b.name.charAt(hi ? 0 : 0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{b.name}</p>
-                    <p className="text-[11px] text-muted-foreground">{hi ? 'वार्ड' : 'Ward'} {b.ward} • {hi ? 'से' : 'since'} {b.since}</p>
-                  </div>
-                  <Badge variant={b.status === 'active' ? 'default' : 'outline'} className="text-[10px]">
-                    {b.status === 'active' ? (hi ? 'सक्रिय' : 'Active') : (hi ? 'लंबित' : 'Pending')}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <h3 className="font-bold text-foreground">{hi ? p.titleHi : p.titleEn}</h3>
+                  <Badge variant="secondary" className="gap-1 shrink-0">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                    {p.count} {hi ? 'लाभार्थी' : 'beneficiaries'}
                   </Badge>
                 </div>
-              ))}
+                <p className="text-lg font-bold text-primary mb-1">₹{p.amount}/{hi ? 'माह' : 'month'}</p>
+                <p className="text-sm text-muted-foreground mb-2">{hi ? p.descHi : p.descEn}</p>
+                <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-2">
+                  <strong>{hi ? 'आवेदन: ' : 'Apply: '}</strong>{hi ? p.applyHi : p.applyEn}
+                </p>
+              </div>
             </div>
           </Card>
         )
       })}
+      <PrivacyNotice hi={hi} />
     </div>
   )
 }
 
-// ── Housing View ──
+// ── Housing View — scheme info + counts, NO fake names ──
 function HousingView({ hi }: { hi: boolean }) {
   const schemes = [
-    { key: 'pmayG', titleHi: 'प्रधानमंत्री आवास योजना — ग्रामीण (PMAY-G)', titleEn: 'PM Awas Yojana — Gramin', amount: 125000, count: 23, beneficiaries: [
-      { name: hi ? 'श्री सुरेश चंद्र मिश्र' : 'Shri Suresh Chandra Mishra', ward: 4, status: 'completed', received: 125000 },
-      { name: hi ? 'श्री दुरेंद्र सिंह' : 'Shri Durendra Singh', ward: 6, status: 'in-progress', received: 85000 },
-      { name: hi ? 'श्री रमेश चंद्र मिश्र' : 'Shri Ramesh Chandra Mishra', ward: 4, status: 'completed', received: 125000 },
-      { name: hi ? 'श्री हेतराम मिश्र' : 'Shri Hetram Mishra', ward: 2, status: 'in-progress', received: 40000 },
-      { name: hi ? 'श्री छोटे मोकदम' : 'Shri Chhote Mokdam', ward: 3, status: 'pending', received: 0 },
-      { name: hi ? 'श्री मुन्नीलाल हरिजन' : 'Shri Munnilal Harizan', ward: 3, status: 'in-progress', received: 85000 },
-      { name: hi ? 'श्री हरिश्चंद्र हरिजन' : 'Shri Harishchandra Harizan', ward: 2, status: 'completed', received: 125000 },
-    ]},
-    { key: 'cmAwas', titleHi: 'मुख्यमंत्री आवास योजना', titleEn: 'CM Awas Yojana', amount: 70000, count: 11, beneficiaries: [
-      { name: hi ? 'श्री अजय कुमार' : 'Shri Ajay Kumar', ward: 5, status: 'completed', received: 70000 },
-      { name: hi ? 'श्री राजेंद्र मिश्र' : 'Shri Rajendra Mishra', ward: 6, status: 'in-progress', received: 40000 },
-      { name: hi ? 'श्री विश्वनाथ मिश्र' : 'Shri Vishwanath Mishra', ward: 4, status: 'pending', received: 0 },
-    ]},
-  ]
-  const newApps = [
-    { name: hi ? 'श्री रामप्रसाद' : 'Shri Ramprasad', ward: 1, status: 'under-review' },
-    { name: hi ? 'श्रीमती फूलमती' : 'Smt. Phoolmati', ward: 5, status: 'under-review' },
-    { name: hi ? 'श्री रवि' : 'Shri Ravi', ward: 5, status: 'documents-pending' },
+    {
+      titleHi: 'प्रधानमंत्री आवास योजना — ग्रामीण (PMAY-G)',
+      titleEn: 'PM Awas Yojana — Gramin (PMAY-G)',
+      amount: 125000,
+      installments: 3,
+      count: 23,
+      descHi: 'ग्रामीण गरीब परिवारों के लिए पक्का घर निर्माण सहायता। ₹1,25,000 तीन किस्तों में।',
+      descEn: 'Pucca house construction assistance for rural poor families. ₹1,25,000 in 3 installments.',
+    },
+    {
+      titleHi: 'मुख्यमंत्री आवास योजना',
+      titleEn: 'CM Awas Yojana',
+      amount: 70000,
+      installments: 2,
+      count: 11,
+      descHi: 'राज्य सरकार की आवास योजना — गरीब परिवारों के लिए ₹70,000 सहायता।',
+      descEn: 'State government housing scheme — ₹70,000 assistance for poor families.',
+    },
   ]
 
   return (
     <div className="space-y-4">
       {schemes.map(s => (
-        <Card key={s.key}>
-          <div className="flex items-center gap-3 p-4 border-b border-border/40 bg-muted/30">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary grid place-items-center">
-              <Home className="h-5 w-5" />
+        <Card key={s.titleEn}>
+          <div className="flex items-start gap-4 p-5">
+            <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-items-center shrink-0">
+              <Home className="h-6 w-6" />
             </div>
-            <div className="flex-1">
-              <h3 className="font-semibold">{hi ? s.titleHi : s.titleEn}</h3>
-              <p className="text-xs text-muted-foreground">₹{s.amount.toLocaleString('en-IN')} • {s.count} {hi ? 'लाभार्थी' : 'beneficiaries'}</p>
-            </div>
-          </div>
-          <div className="divide-y divide-border/30">
-            {s.beneficiaries.map((b, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{b.name}</p>
-                  <p className="text-[11px] text-muted-foreground">{hi ? 'वार्ड' : 'Ward'} {b.ward}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-primary">₹{b.received.toLocaleString('en-IN')}</p>
-                  <Badge variant={b.status === 'completed' ? 'default' : 'outline'} className="text-[10px]">
-                    {b.status === 'completed' ? (hi ? 'पूर्ण' : 'Done') : b.status === 'in-progress' ? (hi ? 'जारी' : 'Progress') : (hi ? 'लंबित' : 'Pending')}
-                  </Badge>
-                </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <h3 className="font-bold">{hi ? s.titleHi : s.titleEn}</h3>
+                <Badge variant="secondary" className="shrink-0">{s.count} {hi ? 'लाभार्थी' : 'beneficiaries'}</Badge>
               </div>
-            ))}
+              <p className="text-lg font-bold text-primary mb-1">₹{s.amount.toLocaleString('en-IN')}</p>
+              <p className="text-sm text-muted-foreground mb-2">{hi ? s.descHi : s.descEn}</p>
+              <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-2">
+                <strong>{hi ? 'किस्तें: ' : 'Installments: '}</strong>{s.installments} {hi ? 'किस्तों में' : 'installments'}
+              </p>
+            </div>
           </div>
         </Card>
       ))}
+
       <Card className="border-primary/30 bg-primary/5">
         <div className="p-4">
-          <h3 className="font-semibold mb-3 flex items-center gap-2">
+          <h3 className="font-semibold mb-2 flex items-center gap-2">
             <FileText className="h-4 w-4 text-primary" />
             {hi ? 'नई आवेदन — आवास के लिए' : 'New Applications — Housing'}
           </h3>
-          <div className="space-y-2">
-            {newApps.map((a, i) => (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <span>{a.name} ({hi ? 'वार्ड' : 'Ward'} {a.ward})</span>
-                <Badge variant="outline" className="text-[10px]">
-                  {a.status === 'under-review' ? (hi ? 'समीक्षा में' : 'Under Review') : (hi ? 'दस्तावेज़ लंबित' : 'Docs Pending')}
-                </Badge>
-              </div>
-            ))}
-          </div>
+          <p className="text-sm text-muted-foreground">
+            {hi
+              ? 'नई आवेदन पंचायत कार्यालय में उपलब्ध हैं। पात्रता: BPL परिवार, कच्चा घर, आधार, बैंक खाता।'
+              : 'New applications available at panchayat office. Eligibility: BPL family, kuccha house, Aadhaar, bank account.'}
+          </p>
         </div>
       </Card>
+
+      <PrivacyNotice hi={hi} />
     </div>
   )
 }
@@ -321,7 +331,7 @@ function RationView({ hi }: { hi: boolean }) {
   )
 }
 
-// ── Handpumps View ──
+// ── Handpumps View — REAL locations provided by user ──
 function HandpumpsView({ hi }: { hi: boolean }) {
   const handpumps = [
     { id: 'HP-01', loc: hi ? 'हेतराम मिश्र के घर के सामने' : 'In front of Hetram Mishra\'s house', type: hi ? 'जल स्तर नीचे' : 'Low water table', ward: 2, status: 'needs-deepening' },
@@ -375,7 +385,7 @@ function HandpumpsView({ hi }: { hi: boolean }) {
   )
 }
 
-// ── Offline Help View ──
+// ── Offline Help View — REAL contacts provided by user ──
 function OfflineHelpView({ hi }: { hi: boolean }) {
   const contacts = [
     {
@@ -428,7 +438,7 @@ function OfflineHelpView({ hi }: { hi: boolean }) {
   )
 }
 
-// ── School Team View ──
+// ── School Team View — REAL photo provided by user ──
 function SchoolTeamView({ hi }: { hi: boolean }) {
   return (
     <Card className="overflow-hidden">
