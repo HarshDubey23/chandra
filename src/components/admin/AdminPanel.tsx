@@ -209,11 +209,6 @@ export function AdminPanel() {
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
                 {locale === 'hi' ? 'साइन इन करें' : 'Sign In'}
               </Button>
-              <div className="text-[11px] text-muted-foreground bg-secondary/40 rounded p-2.5 space-y-1">
-                <div className="font-semibold text-foreground">{locale === 'hi' ? 'डेमो क्रेडेंशियल:' : 'Demo credentials:'}</div>
-                <div className="font-mono">pradhan@chandra-gp.in / chandra2026</div>
-                <div className="font-mono">gpa@chandra-gp.in / secretary2026</div>
-              </div>
             </CardContent>
           </Card>
         </div>

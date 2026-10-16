@@ -15,16 +15,21 @@ export interface SessionUser {
   role: 'admin' | 'secretary' | 'viewer'
 }
 
-const SESSION_SECRET = process.env.SESSION_SECRET!
-if (!SESSION_SECRET || SESSION_SECRET.length < 16) {
-  // In production this must be set. We allow fallback ONLY to avoid hard crash
-  // during cold starts without env, but log a loud warning.
+// Read at request time, not import time, so `next build` works without production secrets.
+// Production still fails closed: signing or verifying a session without a secret throws.
+let warned = false
+function getSecret(): string {
+  const secret = process.env.SESSION_SECRET
+  if (secret && secret.length >= 16) return secret
   if (process.env.NODE_ENV === 'production') {
     throw new Error('SESSION_SECRET environment variable must be set (>= 16 chars) in production')
   }
-  console.warn('⚠️  SESSION_SECRET not set — using insecure dev fallback. Set SESSION_SECRET env var for production.')
+  if (!warned) {
+    console.warn('SESSION_SECRET not set: using an insecure development fallback.')
+    warned = true
+  }
+  return 'gpchandra-dev-fallback-secret-please-change'
 }
-const SECRET = SESSION_SECRET || 'gpchandra-dev-fallback-secret-please-change'
 const COOKIE_NAME = 'gpchandra_session'
 
 // ── scrypt password hashing (per-user salt) ──────────────────────────────
@@ -86,7 +91,7 @@ export function createSessionToken(user: SessionUser): string {
     exp: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 days
   }
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
-  const sig = crypto.createHmac('sha256', SECRET).update(body).digest('base64url')
+  const sig = crypto.createHmac('sha256', getSecret()).update(body).digest('base64url')
   return `${body}.${sig}`
 }
 
@@ -94,7 +99,7 @@ export function verifySessionToken(token: string | undefined | null): SessionUse
   if (!token) return null
   const [body, sig] = token.split('.')
   if (!body || !sig) return null
-  const expected = crypto.createHmac('sha256', SECRET).update(body).digest('base64url')
+  const expected = crypto.createHmac('sha256', getSecret()).update(body).digest('base64url')
   if (sig.length !== expected.length) return null
   let diff = 0
   for (let i = 0; i < sig.length; i++) diff |= sig.charCodeAt(i) ^ expected.charCodeAt(i)

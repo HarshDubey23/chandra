@@ -1,13 +1,22 @@
 // Seed script — Gram Panchayat Chandra
 // Populates DB with OSINT-verified data (codes, scheme names, portal URLs as provenance)
 // and AI-generated gallery image metadata (§4.3 schema).
-// Run: bun run src/lib/seed.ts
+// Run: npx tsx src/lib/seed.ts   (set ADMIN_PASSWORD / SECRETARY_PASSWORD, or random ones are printed once)
 
 import { db } from '@/lib/db'
 import { hashPassword } from '@/lib/auth'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+
+// Never ship a known password: take it from the environment or generate one and print it once.
+function initialPassword(envName: string, who: string): string {
+  const fromEnv = process.env[envName]
+  if (fromEnv && fromEnv.length >= 10) return fromEnv
+  const generated = crypto.randomBytes(12).toString('base64url')
+  console.log(`  ! ${who} password (set ${envName} to choose one): ${generated}`)
+  return generated
+}
 
 function sha256(s: string): string {
   return crypto.createHash('sha256').update(s).digest('hex')
@@ -24,7 +33,7 @@ async function main() {
       email: 'pradhan@chandra-gp.in',
       name: 'श्रीमती संगीता मिश्रा / Smt. Sangita Mishra',
       role: 'admin',
-      passwordHash: hashPassword('chandra2026'),
+      passwordHash: hashPassword(initialPassword('ADMIN_PASSWORD', 'Admin (pradhan@chandra-gp.in)')),
       phone: 'MOB_' + sha256('919651035021').slice(0, 10),
     },
   })
@@ -36,7 +45,7 @@ async function main() {
       email: 'gpa@chandra-gp.in',
       name: 'श्री बलवंत चौहान / Shri Balwant Chauhan',
       role: 'secretary',
-      passwordHash: hashPassword('secretary2026'),
+      passwordHash: hashPassword(initialPassword('SECRETARY_PASSWORD', 'Secretary (gpa@chandra-gp.in)')),
       phone: 'MOB_' + sha256('919651035022').slice(0, 10),
     },
   })
@@ -530,8 +539,8 @@ async function main() {
   })
 
   console.log('\n✅ Seed complete.')
-  console.log('   Admin login:    pradhan@chandra-gp.in / chandra2026')
-  console.log('   Secretary login: gpa@chandra-gp.in / secretary2026')
+  console.log('   Admin login:    pradhan@chandra-gp.in (password printed above)')
+  console.log('   Secretary login: gpa@chandra-gp.in (password printed above)')
   console.log('   Demo tracking IDs: GPCH-DEMO001, GPCH-DEMO002, GPCH-DEMO003')
 }
 
