@@ -51,3 +51,13 @@ prompt
 server.log
 # Skills directory
 /skills/
+# local env, data and sandbox scratch
+.env
+.env.*
+!.env.example
+db/*.db
+prisma/*.db
+upload/
+download/
+tool-results/
+.zscripts/
